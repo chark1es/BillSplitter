@@ -113,6 +113,22 @@ a {
   box-shadow: var(--shadow);
 }
 
+.auth-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid rgba(95, 62, 34, 0.14);
+}
+
+.auth-feature-item {
+  padding: 1.25rem 1.1rem 0;
+  border-right: 1px solid rgba(95, 62, 34, 0.12);
+}
+
+.auth-feature-item:last-child {
+  border-right: 0;
+}
+
 .share-panel {
   border: 1px solid rgba(95, 62, 34, 0.2);
   border-radius: 2rem;
@@ -288,6 +304,18 @@ a {
   .upload-zone,
   .bill-total-card {
     border-radius: 1.35rem;
+  }
+
+  .auth-feature-grid {
+    grid-template-columns: 1fr;
+    border-top: 0;
+    gap: 0.8rem;
+  }
+
+  .auth-feature-item {
+    border-right: 0;
+    border-top: 1px solid rgba(95, 62, 34, 0.12);
+    padding: 1rem 0 0;
   }
 }
 

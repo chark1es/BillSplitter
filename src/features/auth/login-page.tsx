@@ -38,8 +38,8 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   };
 
   return (
-    <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-6 lg:px-8 lg:py-12">
-      <section className="hero-panel px-5 py-7 sm:px-7 sm:py-9 lg:px-10 lg:py-11">
+    <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">
+      <section className="hero-panel px-6 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
         <p className="eyebrow mb-3">FairShare</p>
         <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl lg:max-w-3xl lg:text-7xl">
           Turn a messy receipt into a clean group payout flow.
@@ -47,19 +47,19 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
         <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg sm:leading-8">
           FairShare turns the splitter concept into a protected app with saved drafts, guided multi-step routes, and a share-ready summary for every dinner.
         </p>
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="auth-feature-grid mt-8">
           {features.map((feature) => (
-            <li key={feature.title} className="panel list-none p-4 sm:p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)] sm:text-sm">
+            <li key={feature.title} className="auth-feature-item list-none">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)] sm:text-sm">
                 {feature.title}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{feature.body}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-[0.95rem]">{feature.body}</p>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="panel p-5 sm:p-7 lg:p-9">
+      <section className="panel p-6 sm:p-8 lg:p-10">
         <p className="eyebrow mb-3">Login</p>
         <h2 className="display text-3xl text-[var(--ink)] sm:text-4xl">Continue with Google.</h2>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base sm:leading-7">
