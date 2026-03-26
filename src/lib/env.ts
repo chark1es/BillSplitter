@@ -2,6 +2,9 @@ const FALLBACK_APP_URL = "http://localhost:3000";
 const FALLBACK_CONVEX_URL = "https://example.convex.cloud";
 const FALLBACK_CONVEX_SITE_URL = "https://example.convex.site";
 
+const isLocalhostUrl = (value?: string | null) =>
+  Boolean(value && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value));
+
 const deriveConvexSiteUrl = (convexUrl?: string | null) => {
   if (!convexUrl) {
     return null;
@@ -42,7 +45,10 @@ export const getServerEnv = () => ({
     deriveConvexSiteUrl(process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL) ??
     FALLBACK_CONVEX_SITE_URL,
   appUrl:
-    process.env.BETTER_AUTH_URL ??
+    (isLocalhostUrl(process.env.BETTER_AUTH_URL) && process.env.APP_PUBLIC_URL
+      ? process.env.APP_PUBLIC_URL
+      : process.env.BETTER_AUTH_URL) ??
+    process.env.APP_PUBLIC_URL ??
     process.env.VITE_APP_URL ??
     FALLBACK_APP_URL,
   betterAuthSecret:

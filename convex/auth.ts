@@ -27,6 +27,9 @@ const splitCsv = (value?: string) =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const isLocalhostUrl = (value?: string) =>
+  Boolean(value && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value));
+
 const deriveConvexSiteUrl = (convexUrl?: string) => {
   if (!convexUrl) {
     return null;
@@ -48,7 +51,10 @@ const deriveConvexSiteUrl = (convexUrl?: string) => {
 const getServerAuthEnv = () => ({
   convexUrl: process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL,
   appUrl:
-    process.env.BETTER_AUTH_URL ??
+    (isLocalhostUrl(process.env.BETTER_AUTH_URL) && process.env.APP_PUBLIC_URL
+      ? process.env.APP_PUBLIC_URL
+      : process.env.BETTER_AUTH_URL) ??
+    process.env.APP_PUBLIC_URL ??
     process.env.VITE_APP_URL ??
     FALLBACK_APP_URL,
   secret: process.env.BETTER_AUTH_SECRET ?? FALLBACK_SECRET,
