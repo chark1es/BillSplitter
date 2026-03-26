@@ -125,11 +125,12 @@ export function ReviewStep() {
     <div className="space-y-6">
       <BillWizardNavBar
         onBack={() => navigate({ to: "/bills/new/assign" })}
-        step={4}
+        step={5}
+        totalSteps={5}
         backLabel="Back to assign"
       />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 4</p>
+        <p className="eyebrow mb-3">Step 5</p>
         <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
           Review before you send.
         </h1>

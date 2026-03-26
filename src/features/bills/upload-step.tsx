@@ -5,7 +5,6 @@ import { convertReceiptFileToWebp } from "../../lib/receipt/image-to-webp";
 import { useUploadThing } from "../../lib/uploadthing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
-import { roundMoney } from "../../lib/drafts/local-bill-draft";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 
 type PreviewRow = {
@@ -58,23 +57,23 @@ export function UploadStep() {
       parsedReceipt.taxForeignAmount +
       parsedReceipt.tipForeignAmount
     : 0;
+  const parsedReceiptRecord = parsedReceipt as Record<string, unknown> | null;
+  const discountForeignAmount =
+    parsedReceiptRecord && typeof parsedReceiptRecord.discountForeignAmount === "number"
+      ? parsedReceiptRecord.discountForeignAmount
+      : parsedReceiptRecord && typeof parsedReceiptRecord.discountAmount === "number"
+        ? parsedReceiptRecord.discountAmount
+        : 0;
+  const discountUsdAmount =
+    parsedReceiptRecord && typeof parsedReceiptRecord.discountUsdAmount === "number"
+      ? parsedReceiptRecord.discountUsdAmount
+      : parsedReceiptRecord && typeof parsedReceiptRecord.discountAmountUsd === "number"
+        ? parsedReceiptRecord.discountAmountUsd
+        : 0;
+  const adjustedGrandTotalForeign = computedGrandTotalForeign - discountForeignAmount;
+  const adjustedGrandTotalUsd = computedGrandTotalUsd - discountUsdAmount;
 
   const canProceed = Boolean(parsedReceipt) && !isParsing;
-
-  const updateParsedReceipt = (
-    updater: (parsed: NonNullable<typeof parsedReceipt>) => NonNullable<typeof parsedReceipt>,
-  ) => {
-    patchDraft((prev) => {
-      if (!prev.receipt.parsed) return prev;
-      return {
-        ...prev,
-        receipt: {
-          ...prev.receipt,
-          parsed: updater(prev.receipt.parsed),
-        },
-      };
-    });
-  };
 
   const replaceOrAddPagesWithFiles = async (
     fileList: FileList | null,
@@ -262,7 +261,11 @@ export function UploadStep() {
 
   return (
     <div className="space-y-6">
-      <BillWizardNavBar onBack={() => navigate({ to: "/dashboard" })} step={1} />
+      <BillWizardNavBar
+        onBack={() => navigate({ to: "/dashboard" })}
+        step={1}
+        totalSteps={5}
+      />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
         <p className="eyebrow mb-3">Step 1</p>
         <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
@@ -426,10 +429,10 @@ export function UploadStep() {
             <div className="mt-8 border-t border-[var(--line)] pt-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="eyebrow mb-2">Receipt editor</p>
+                  <p className="eyebrow mb-2">Receipt parsed</p>
                   <p className="text-sm text-[var(--muted)]">
-                    Edit foreign + USD directly. Conversion uses the FX snapshot
-                    captured when parsing (live rates at that moment).
+                    Continue to the next step to review line items in a table and edit
+                    them in a mobile-friendly modal.
                   </p>
                 </div>
                 <button
@@ -444,9 +447,7 @@ export function UploadStep() {
 
               <div className="mt-6 grid gap-4 lg:grid-cols-2">
                 <div className="rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface-2)] p-5">
-                  <p className="eyebrow">
-                    Before ({parsedReceipt.currencyCode})
-                  </p>
+                  <p className="eyebrow">Before ({parsedReceipt.currencyCode})</p>
                   <dl className="mt-4 space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Subtotal</dt>
@@ -456,20 +457,26 @@ export function UploadStep() {
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tax</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
                         {parsedReceipt.taxForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tip</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
                         {parsedReceipt.tipForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-[var(--muted)]">Discount</dt>
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
+                        -{discountForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
                       <dt className="font-semibold text-[var(--ink)]">Total</dt>
                       <dd className="tabular-nums font-bold text-[var(--ink)]">
-                        {computedGrandTotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
+                        {adjustedGrandTotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
                       </dd>
                     </div>
                   </dl>
@@ -486,310 +493,30 @@ export function UploadStep() {
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tax</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
                         {parsedReceipt.taxUsdAmount.toFixed(2)} USD
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tip</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
                         {parsedReceipt.tipUsdAmount.toFixed(2)} USD
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="text-[var(--muted)]">Discount</dt>
+                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
+                        -{discountUsdAmount.toFixed(2)} USD
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
                       <dt className="font-semibold text-[var(--ink)]">Total</dt>
                       <dd className="tabular-nums font-bold text-[var(--ink)]">
-                        {computedGrandTotalUsd.toFixed(2)} USD
+                        {adjustedGrandTotalUsd.toFixed(2)} USD
                       </dd>
                     </div>
                   </dl>
                 </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="eyebrow">Line items</p>
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      1 USD ={" "}
-                      {parsedReceipt.fxSnapshot.foreignUnitsPerUsd}{" "}
-                      {parsedReceipt.currencyCode} (as of{" "}
-                      {parsedReceipt.fxSnapshot.date})
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    {parsedReceipt.confidence != null
-                      ? `Model confidence: ${(parsedReceipt.confidence * 100).toFixed(0)}%`
-                      : null}
-                  </p>
-                </div>
-
-                {parsedReceipt.items.length === 0 ? (
-                  <p className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-2)] px-4 py-6 text-sm text-[var(--muted)]">
-                    No line items yet. Add pages and parse the receipt.
-                  </p>
-                ) : (
-                  <div className="mt-4 grid gap-4">
-                    {parsedReceipt.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-[1.5rem] border border-[var(--line)] bg-[var(--surface)] p-4"
-                      >
-                        <div className="grid gap-4 lg:grid-cols-2">
-                          <div>
-                            <p className="text-xs font-semibold text-[var(--muted)]">
-                              Before ({parsedReceipt.currencyCode})
-                            </p>
-                            <div className="mt-2 grid gap-3">
-                              <label className="grid gap-1 text-xs">
-                                <span className="text-[var(--muted)]">Name</span>
-                                <input
-                                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                                  value={item.foreignName}
-                                  onChange={(e) =>
-                                    updateParsedReceipt((parsed) => ({
-                                      ...parsed,
-                                      items: parsed.items.map((it) =>
-                                        it.id === item.id
-                                          ? { ...it, foreignName: e.target.value }
-                                          : it,
-                                      ),
-                                    }))
-                                  }
-                                  type="text"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs">
-                                <span className="text-[var(--muted)]">Price</span>
-                                <input
-                                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                                  inputMode="decimal"
-                                  step="0.01"
-                                  type="number"
-                                  value={item.foreignPrice}
-                                  onChange={(e) => {
-                                    const next = Number(e.target.value);
-                                    if (!Number.isFinite(next)) return;
-                                    const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                                    const usd = roundMoney(next / rate);
-                                    updateParsedReceipt((parsed) => ({
-                                      ...parsed,
-                                      items: parsed.items.map((it) =>
-                                        it.id === item.id
-                                          ? {
-                                              ...it,
-                                              foreignPrice: next,
-                                              usdPrice: usd,
-                                            }
-                                          : it,
-                                      ),
-                                    }));
-                                  }}
-                                />
-                              </label>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-semibold text-[var(--muted)]">
-                              After (USD)
-                            </p>
-                            <div className="mt-2 grid gap-3">
-                              <label className="grid gap-1 text-xs">
-                                <span className="text-[var(--muted)]">Name</span>
-                                <input
-                                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                                  value={item.translatedName}
-                                  onChange={(e) =>
-                                    updateParsedReceipt((parsed) => ({
-                                      ...parsed,
-                                      items: parsed.items.map((it) =>
-                                        it.id === item.id
-                                          ? {
-                                              ...it,
-                                              translatedName: e.target.value,
-                                            }
-                                          : it,
-                                      ),
-                                    }))
-                                  }
-                                  type="text"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs">
-                                <span className="text-[var(--muted)]">Price</span>
-                                <input
-                                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                                  inputMode="decimal"
-                                  step="0.01"
-                                  type="number"
-                                  value={item.usdPrice}
-                                  onChange={(e) => {
-                                    const next = Number(e.target.value);
-                                    if (!Number.isFinite(next)) return;
-                                    const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                                    const foreign = roundMoney(next * rate);
-                                    updateParsedReceipt((parsed) => ({
-                                      ...parsed,
-                                      items: parsed.items.map((it) =>
-                                        it.id === item.id
-                                          ? {
-                                              ...it,
-                                              usdPrice: next,
-                                              foreignPrice: foreign,
-                                            }
-                                          : it,
-                                      ),
-                                    }));
-                                  }}
-                                />
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-                  <p className="eyebrow">
-                    Tax & tip (Before {parsedReceipt.currencyCode})
-                  </p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs">
-                      <span className="text-[var(--muted)]">
-                        Tax ({parsedReceipt.currencyCode})
-                      </span>
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="number"
-                        value={parsedReceipt.taxForeignAmount}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (!Number.isFinite(next)) return;
-                          const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                          const usd = roundMoney(next / rate);
-                          updateParsedReceipt((parsed) => ({
-                            ...parsed,
-                            taxForeignAmount: next,
-                            taxUsdAmount: usd,
-                          }));
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs">
-                      <span className="text-[var(--muted)]">
-                        Tip ({parsedReceipt.currencyCode})
-                      </span>
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="number"
-                        value={parsedReceipt.tipForeignAmount}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (!Number.isFinite(next)) return;
-                          const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                          const usd = roundMoney(next / rate);
-                          updateParsedReceipt((parsed) => ({
-                            ...parsed,
-                            tipForeignAmount: next,
-                            tipUsdAmount: usd,
-                          }));
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-                  <p className="eyebrow">Tax & tip (After USD)</p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-1 text-xs">
-                      <span className="text-[var(--muted)]">Tax (USD)</span>
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="number"
-                        value={parsedReceipt.taxUsdAmount}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (!Number.isFinite(next)) return;
-                          const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                          const foreign = roundMoney(next * rate);
-                          updateParsedReceipt((parsed) => ({
-                            ...parsed,
-                            taxUsdAmount: next,
-                            taxForeignAmount: foreign,
-                          }));
-                        }}
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs">
-                      <span className="text-[var(--muted)]">Tip (USD)</span>
-                      <input
-                        className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                        inputMode="decimal"
-                        step="0.01"
-                        type="number"
-                        value={parsedReceipt.tipUsdAmount}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (!Number.isFinite(next)) return;
-                          const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
-                          const foreign = roundMoney(next * rate);
-                          updateParsedReceipt((parsed) => ({
-                            ...parsed,
-                            tipUsdAmount: next,
-                            tipForeignAmount: foreign,
-                          }));
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  className={`secondary-button ${
-                    parsedReceipt.taxTipMode === "proportional"
-                      ? "ring-2 ring-[var(--accent)]"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    updateParsedReceipt((parsed) => ({
-                      ...parsed,
-                      taxTipMode: "proportional",
-                    }))
-                  }
-                  type="button"
-                >
-                  Tax & tip: proportional
-                </button>
-                <button
-                  className={`secondary-button ${
-                    parsedReceipt.taxTipMode === "equal"
-                      ? "ring-2 ring-[var(--accent)]"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    updateParsedReceipt((parsed) => ({
-                      ...parsed,
-                      taxTipMode: "equal",
-                    }))
-                  }
-                  type="button"
-                >
-                  Tax & tip: equal split
-                </button>
               </div>
             </div>
           ) : null}
@@ -799,7 +526,7 @@ export function UploadStep() {
           <p className="eyebrow mb-3">Next</p>
           <ol className="space-y-3 text-sm leading-6 text-[var(--muted)]">
             <li>1. Optimize and upload images.</li>
-            <li>2. Parse and review line items and computed totals.</li>
+            <li>2. Review itemized receipt in table view.</li>
             <li>3. Add who split the bill.</li>
           </ol>
           {!parsedReceipt ? (
@@ -817,12 +544,12 @@ export function UploadStep() {
               disabled={!canProceed}
               onClick={() =>
                 navigate({
-                  to: "/bills/new/participants",
+                  to: "/bills/new/itemized",
                 })
               }
               type="button"
             >
-              Next: add people
+              Next: itemized receipt
             </button>
           )}
         </aside>

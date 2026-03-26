@@ -175,12 +175,13 @@ export function ParticipantsStep() {
   return (
     <div className="space-y-6">
       <BillWizardNavBar
-        onBack={() => navigate({ to: "/bills/new/upload" })}
-        step={2}
-        backLabel="Back to upload"
+        onBack={() => navigate({ to: "/bills/new/itemized" })}
+        step={3}
+        totalSteps={5}
+        backLabel="Back to itemized receipt"
       />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 2</p>
+        <p className="eyebrow mb-3">Step 3</p>
         <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
           Who split the table?
         </h1>

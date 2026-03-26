@@ -21,6 +21,7 @@ import { Route as AuthenticatedAdminInvitesRouteImport } from './routes/_authent
 import { Route as AuthenticatedBillsNewUploadRouteImport } from './routes/_authenticated/bills/new/upload'
 import { Route as AuthenticatedBillsNewReviewRouteImport } from './routes/_authenticated/bills/new/review'
 import { Route as AuthenticatedBillsNewParticipantsRouteImport } from './routes/_authenticated/bills/new/participants'
+import { Route as AuthenticatedBillsNewItemizedRouteImport } from './routes/_authenticated/bills/new/itemized'
 import { Route as AuthenticatedBillsNewAssignRouteImport } from './routes/_authenticated/bills/new/assign'
 import { Route as AuthenticatedBillsBillIdShareRouteImport } from './routes/_authenticated/bills/$billId/share'
 
@@ -99,6 +100,16 @@ const AuthenticatedBillsNewParticipantsRoute =
       (d) => d.Route,
     ),
   )
+const AuthenticatedBillsNewItemizedRoute =
+  AuthenticatedBillsNewItemizedRouteImport.update({
+    id: '/bills/new/itemized',
+    path: '/bills/new/itemized',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/bills/new/itemized.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const AuthenticatedBillsNewAssignRoute =
   AuthenticatedBillsNewAssignRouteImport.update({
     id: '/bills/new/assign',
@@ -131,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
   '/bills/$billId/share': typeof AuthenticatedBillsBillIdShareRoute
   '/bills/new/assign': typeof AuthenticatedBillsNewAssignRoute
+  '/bills/new/itemized': typeof AuthenticatedBillsNewItemizedRoute
   '/bills/new/participants': typeof AuthenticatedBillsNewParticipantsRoute
   '/bills/new/review': typeof AuthenticatedBillsNewReviewRoute
   '/bills/new/upload': typeof AuthenticatedBillsNewUploadRoute
@@ -146,6 +158,7 @@ export interface FileRoutesByTo {
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
   '/bills/$billId/share': typeof AuthenticatedBillsBillIdShareRoute
   '/bills/new/assign': typeof AuthenticatedBillsNewAssignRoute
+  '/bills/new/itemized': typeof AuthenticatedBillsNewItemizedRoute
   '/bills/new/participants': typeof AuthenticatedBillsNewParticipantsRoute
   '/bills/new/review': typeof AuthenticatedBillsNewReviewRoute
   '/bills/new/upload': typeof AuthenticatedBillsNewUploadRoute
@@ -163,6 +176,7 @@ export interface FileRoutesById {
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
   '/_authenticated/bills/$billId/share': typeof AuthenticatedBillsBillIdShareRoute
   '/_authenticated/bills/new/assign': typeof AuthenticatedBillsNewAssignRoute
+  '/_authenticated/bills/new/itemized': typeof AuthenticatedBillsNewItemizedRoute
   '/_authenticated/bills/new/participants': typeof AuthenticatedBillsNewParticipantsRoute
   '/_authenticated/bills/new/review': typeof AuthenticatedBillsNewReviewRoute
   '/_authenticated/bills/new/upload': typeof AuthenticatedBillsNewUploadRoute
@@ -180,6 +194,7 @@ export interface FileRouteTypes {
     | '/api/uploadthing/$'
     | '/bills/$billId/share'
     | '/bills/new/assign'
+    | '/bills/new/itemized'
     | '/bills/new/participants'
     | '/bills/new/review'
     | '/bills/new/upload'
@@ -195,6 +210,7 @@ export interface FileRouteTypes {
     | '/api/uploadthing/$'
     | '/bills/$billId/share'
     | '/bills/new/assign'
+    | '/bills/new/itemized'
     | '/bills/new/participants'
     | '/bills/new/review'
     | '/bills/new/upload'
@@ -211,6 +227,7 @@ export interface FileRouteTypes {
     | '/api/uploadthing/$'
     | '/_authenticated/bills/$billId/share'
     | '/_authenticated/bills/new/assign'
+    | '/_authenticated/bills/new/itemized'
     | '/_authenticated/bills/new/participants'
     | '/_authenticated/bills/new/review'
     | '/_authenticated/bills/new/upload'
@@ -311,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBillsNewParticipantsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/bills/new/itemized': {
+      id: '/_authenticated/bills/new/itemized'
+      path: '/bills/new/itemized'
+      fullPath: '/bills/new/itemized'
+      preLoaderRoute: typeof AuthenticatedBillsNewItemizedRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/bills/new/assign': {
       id: '/_authenticated/bills/new/assign'
       path: '/bills/new/assign'
@@ -334,6 +358,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminInvitesRoute: typeof AuthenticatedAdminInvitesRoute
   AuthenticatedBillsBillIdShareRoute: typeof AuthenticatedBillsBillIdShareRoute
   AuthenticatedBillsNewAssignRoute: typeof AuthenticatedBillsNewAssignRoute
+  AuthenticatedBillsNewItemizedRoute: typeof AuthenticatedBillsNewItemizedRoute
   AuthenticatedBillsNewParticipantsRoute: typeof AuthenticatedBillsNewParticipantsRoute
   AuthenticatedBillsNewReviewRoute: typeof AuthenticatedBillsNewReviewRoute
   AuthenticatedBillsNewUploadRoute: typeof AuthenticatedBillsNewUploadRoute
@@ -345,6 +370,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminInvitesRoute: AuthenticatedAdminInvitesRoute,
   AuthenticatedBillsBillIdShareRoute: AuthenticatedBillsBillIdShareRoute,
   AuthenticatedBillsNewAssignRoute: AuthenticatedBillsNewAssignRoute,
+  AuthenticatedBillsNewItemizedRoute: AuthenticatedBillsNewItemizedRoute,
   AuthenticatedBillsNewParticipantsRoute:
     AuthenticatedBillsNewParticipantsRoute,
   AuthenticatedBillsNewReviewRoute: AuthenticatedBillsNewReviewRoute,

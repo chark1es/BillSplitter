@@ -6,7 +6,7 @@ import {
   hydrateBillWithAssignments,
 } from "../../lib/bill-calculations";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
-import type { AssignmentMap, BillDetail } from "../../lib/types";
+import type { AssignmentMap } from "../../lib/types";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
@@ -122,10 +122,11 @@ export function AssignStep() {
     <div className="space-y-6">
       <BillWizardNavBar
         onBack={() => navigate({ to: "/bills/new/participants" })}
-        step={3}
+        step={4}
+        totalSteps={5}
       />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 3</p>
+        <p className="eyebrow mb-3">Step 4</p>
         <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
           Assign every item.
         </h1>

@@ -18,8 +18,8 @@
   --header: rgba(248, 242, 233, 0.88);
   --line: rgba(95, 62, 34, 0.12);
   --ink: #1f1611;
-  --muted: oklch(0.97 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: #695347;
+  --accent: #9c4e1f;
   --accent-strong: #6a2d08;
   --accent-soft: rgba(156, 78, 31, 0.12);
   --teal: #0f766e;
