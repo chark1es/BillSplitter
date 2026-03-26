@@ -64,6 +64,11 @@ export function AssignStep() {
     () => !assignmentMapsEqualForItems(itemIds, assignmentMap, serverAssignmentMap),
     [assignmentMap, itemIds, serverAssignmentMap],
   );
+  const totalItems = bill?.items.length ?? 0;
+  const assignedItemCount = useMemo(() => {
+    if (!bill) return 0;
+    return bill.items.filter((item) => (assignmentMap[item.id] ?? []).length > 0).length;
+  }, [assignmentMap, bill]);
 
   useEffect(() => {
     if (!assignmentsDirty || !bill) {
@@ -114,6 +119,21 @@ export function AssignStep() {
     });
   };
 
+  const assignAllParticipants = (itemId: string) => {
+    if (!bill) return;
+    setAssignmentMap((currentValue) => ({
+      ...currentValue,
+      [itemId]: bill.participants.map((participant) => participant.id),
+    }));
+  };
+
+  const clearAssignments = (itemId: string) => {
+    setAssignmentMap((currentValue) => ({
+      ...currentValue,
+      [itemId]: [],
+    }));
+  };
+
   if (!bill || !summary) {
     return null;
   }
@@ -140,8 +160,26 @@ export function AssignStep() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_22rem]">
-        <article className="panel p-6 sm:p-8">
-          <div className="mt-2 grid gap-2">
+        <article className="panel p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--line)] bg-white/55 px-3 py-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                Itemized split
+              </p>
+              <p className="text-[0.7rem] text-[var(--muted)] sm:text-xs">
+                {assignedItemCount}/{totalItems} items fully assigned
+              </p>
+            </div>
+            <div className="w-20 overflow-hidden rounded-full bg-[var(--line)]">
+              <div
+                className="h-1.5 rounded-full bg-[var(--accent)] transition-all duration-300"
+                style={{
+                  width: `${(assignedItemCount / Math.max(totalItems, 1)) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+          <div className="mt-1 grid gap-2">
             {bill.items.map((item) => {
               const assignedIds = assignmentMap[item.id] ?? [];
               const isExpanded = expandedItemId === item.id;
@@ -149,13 +187,14 @@ export function AssignStep() {
               const assignedPeople = assignedIds
                 .map((id) => participantById[id])
                 .filter(Boolean);
+              const everyoneAssigned = assignedIds.length === bill.participants.length;
 
               return (
                 <article
-                  className={`rounded-[1.7rem] border px-3 py-2.5 transition-colors sm:px-3.5 sm:py-3 ${
+                  className={`rounded-2xl border px-2.5 py-2 transition-all duration-200 sm:px-3 sm:py-2.5 ${
                     hasAssignees
-                      ? "border-emerald-500/25 bg-emerald-600/[0.06]"
-                      : "border-rose-400/30 bg-rose-500/[0.06]"
+                      ? "border-emerald-500/30 bg-emerald-600/[0.07] shadow-[0_8px_24px_rgba(14,116,62,0.12)]"
+                      : "border-rose-400/35 bg-rose-500/[0.07]"
                   }`}
                   key={item.id}
                 >
@@ -169,17 +208,20 @@ export function AssignStep() {
                     type="button"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold leading-snug text-[var(--ink)] sm:text-sm">
+                      <span className="mb-0.5 inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] sm:text-[0.62rem]">
+                        {assignedIds.length}/{bill.participants.length} selected
+                      </span>
+                      <span className="block text-[0.72rem] font-semibold leading-snug text-[var(--ink)] sm:text-xs">
                         {item.name}
                       </span>
-                      <span className="mt-0.5 block text-[0.7rem] tabular-nums text-[var(--muted)] sm:text-xs">
+                      <span className="mt-0.5 block text-[0.66rem] tabular-nums text-[var(--muted)] sm:text-[0.72rem]">
                         ${item.price.toFixed(2)}
                       </span>
                     </span>
                     {!isExpanded ? (
                       <span className="max-w-[58%] shrink-0 text-right">
                         {assignedPeople.length > 0 ? (
-                          <span className="line-clamp-2 text-[0.65rem] leading-snug text-[var(--muted)] sm:text-xs">
+                          <span className="line-clamp-2 text-[0.63rem] leading-snug text-[var(--muted)] sm:text-[0.7rem]">
                             {assignedPeople.map((p) => p.name).join(", ")}
                           </span>
                         ) : (
@@ -192,12 +234,34 @@ export function AssignStep() {
                   </button>
 
                   {isExpanded ? (
-                    <div className="mt-2.5 flex flex-wrap gap-1.5 border-t border-[var(--line)] pt-2.5">
+                    <div className="mt-2 border-t border-[var(--line)] pt-2">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                          Quick select
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            className={`mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem] ${everyoneAssigned ? "border-emerald-600/45 bg-emerald-600/15 text-emerald-700" : ""}`}
+                            onClick={() => assignAllParticipants(item.id)}
+                            type="button"
+                          >
+                            Everyone
+                          </button>
+                          <button
+                            className={`mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem] ${assignedIds.length === 0 ? "border-rose-500/45 bg-rose-500/14 text-rose-700" : ""}`}
+                            onClick={() => clearAssignments(item.id)}
+                            type="button"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
                       {bill.participants.map((participant) => {
                         const isAssigned = assignedIds.includes(participant.id);
                         return (
                           <button
-                            className={`mini-chip py-1.5 text-[0.7rem] sm:text-xs ${isAssigned ? "ring-2 ring-[var(--accent)]" : ""}`}
+                            className={`mini-chip py-1 text-[0.66rem] sm:text-[0.72rem] ${isAssigned ? "border-transparent shadow-[0_6px_14px_rgba(31,22,17,0.14)]" : ""}`}
                             key={participant.id}
                             onClick={() => toggleAssignment(item.id, participant.id)}
                             style={
@@ -211,10 +275,16 @@ export function AssignStep() {
                             }
                             type="button"
                           >
-                            {participant.initials} {participant.name}
+                            <span
+                              className={`inline-flex h-4 w-4 items-center justify-center rounded-full border text-[0.58rem] font-bold ${isAssigned ? "border-current bg-current/15" : "border-[var(--line)] bg-white/60 text-[var(--muted)]"}`}
+                            >
+                              {isAssigned ? "✓" : participant.initials}
+                            </span>
+                            <span>{participant.name}</span>
                           </button>
                         );
                       })}
+                      </div>
                     </div>
                   ) : null}
                 </article>

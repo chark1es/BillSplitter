@@ -19,6 +19,9 @@ const config = defineConfig({
       port: 3000,
     },
   },
+  preview: {
+    allowedHosts: ['fairshare.spwnd.dev'],
+  },
   plugins: [
     devtools(),
     tsconfigPaths({ projects: ['./tsconfig.json'] }),
