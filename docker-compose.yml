@@ -1,0 +1,21 @@
+# Dokploy persists environment variables to a `.env` file alongside this compose file.
+# `env_file` loads every key from that file into the container (no per-variable list).
+# For local runs: `cp .env.example .env` and fill values.
+#
+# Build-time: `VITE_*` are baked into the client bundle via Dockerfile ARGs;
+# substitution uses the same `.env` when you `docker compose build`.
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_APP_URL: ${VITE_APP_URL}
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+    expose:
+      - "3000"

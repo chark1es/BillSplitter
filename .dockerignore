@@ -1,0 +1,11 @@
+node_modules
+dist
+# Local envs/secrets shouldn't go into the image build context.
+.env
+.env.*
+
+# Editor / OS junk.
+.vscode
+*.swp
+*.swo
+

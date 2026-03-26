@@ -1,0 +1,256 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --bg: #f6f2ea;
+  --bg-2: #efe7da;
+  --surface: rgba(255, 252, 246, 0.82);
+  --surface-2: rgba(255, 252, 246, 0.56);
+  --header: rgba(248, 242, 233, 0.88);
+  --line: rgba(95, 62, 34, 0.12);
+  --ink: #1f1611;
+  --muted: #695347;
+  --accent: #9c4e1f;
+  --accent-strong: #6a2d08;
+  --accent-soft: rgba(156, 78, 31, 0.12);
+  --teal: #0f766e;
+  --shadow: 0 24px 60px rgba(46, 31, 20, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings:
+    "cv11" 1,
+    "ss01" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-2);
+}
+
+a {
+  color: inherit;
+}
+
+.display {
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.045em;
+  line-height: 1.08 !important;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1.35;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  border-radius: 2rem;
+}
+
+.hero-panel {
+  border: 1px solid rgba(95, 62, 34, 0.1);
+  border-radius: 2.3rem;
+  background: rgba(255, 249, 241, 0.95);
+  box-shadow: var(--shadow);
+}
+
+.share-panel {
+  border: 1px solid rgba(95, 62, 34, 0.2);
+  border-radius: 2rem;
+  background: #3a2417;
+  box-shadow: var(--shadow);
+}
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.brand-mark,
+.avatar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: white;
+  font-weight: 800;
+}
+
+.brand-mark {
+  height: 3rem;
+  width: 3rem;
+  background: var(--accent);
+  box-shadow: 0 14px 28px rgba(106, 45, 8, 0.22);
+}
+
+.avatar-badge {
+  height: 3rem;
+  width: 3rem;
+  background: var(--accent);
+}
+
+.nav-pill,
+.primary-button,
+.secondary-button,
+.mini-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: 999px;
+  font-weight: 700;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.nav-pill,
+.secondary-button,
+.mini-chip {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.nav-pill,
+.secondary-button {
+  padding: 0.78rem 1.15rem;
+}
+
+.nav-pill.is-active,
+.nav-pill:hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.primary-button {
+  padding: 0.92rem 1.2rem;
+  border: 0;
+  background: var(--accent-strong);
+  color: white;
+  box-shadow: 0 18px 34px rgba(33, 21, 12, 0.18);
+}
+
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.status-pill {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.68);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.status-pill.is-confirmed {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--teal);
+}
+
+.bill-card,
+.receipt-row,
+.participant-card,
+.upload-zone,
+.bill-total-card {
+  border-radius: 1.7rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.bill-card,
+.bill-total-card {
+  padding: 1.2rem 1.25rem;
+}
+
+.receipt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+}
+
+.participant-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  text-align: left;
+}
+
+.participant-card.is-selected {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+.upload-zone {
+  display: flex;
+  min-height: 18rem;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem;
+  text-align: left;
+}
+
+.upload-zone:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.mini-chip {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 768px) {
+  .panel,
+  .hero-panel,
+  .share-panel {
+    border-radius: 1.6rem;
+  }
+
+  .bill-card,
+  .receipt-row,
+  .participant-card,
+  .upload-zone,
+  .bill-total-card {
+    border-radius: 1.35rem;
+  }
+}
