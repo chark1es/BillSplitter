@@ -39,7 +39,7 @@ export type BillParticipant = {
 export type BillItem = {
   id: BillItemId;
   name: string;
-  originalLabel?: string;
+  originalLabel: string | undefined;
   price: number;
 };
 

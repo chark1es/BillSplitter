@@ -7,7 +7,10 @@ import type { RouterContext } from "./lib/router-context";
 
 const emptyAuth: RouterContext["auth"] = {
   user: null,
+  deniedProfile: null,
   isAuthenticated: false,
+  allowed: false,
+  isAdmin: false,
   isBypassMode: false,
   initialToken: null,
 };

@@ -81,7 +81,6 @@ const itemsSubtotal = (bill: BillDetail) =>
   bill.items.reduce((sum, item) => sum + item.price, 0);
 
 export const calculateTaxTipShare = (
-  participant: BillParticipant,
   bill: BillDetail,
   itemSubtotalForPerson: number,
 ) => {
@@ -112,7 +111,7 @@ export const buildBillSummary = (bill: BillDetail) => {
 
   const summaries: BillSummaryRow[] = bill.participants.map((participant) => {
     const itemSubtotal = calculatePersonItemTotal(participant, bill);
-    const taxTipShare = calculateTaxTipShare(participant, bill, itemSubtotal);
+    const taxTipShare = calculateTaxTipShare(bill, itemSubtotal);
     const items = bill.items.flatMap((item) => {
       const assignees = bill.assignments.filter(
         (assignment) => assignment.itemId === item.id,
