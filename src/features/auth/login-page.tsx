@@ -66,7 +66,7 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
           <div className="mt-10">
             {!envConfigured ? (
               <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Set `VITE_CONVEX_URL`, `CONVEX_SITE_URL`, `BETTER_AUTH_URL`,
+                Set `VITE_CONVEX_URL`, `VITE_CONVEX_SITE_URL` (or `CONVEX_SITE_URL`), `BETTER_AUTH_URL`,
                 `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and
                 `GOOGLE_CLIENT_SECRET` before testing the live auth flow.
               </p>

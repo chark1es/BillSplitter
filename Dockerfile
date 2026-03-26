@@ -5,8 +5,10 @@ WORKDIR /app
 # Client bundle: Vite inlines `import.meta.env.VITE_*` at build time.
 ARG VITE_APP_URL
 ARG VITE_CONVEX_URL
+ARG VITE_CONVEX_SITE_URL
 ENV VITE_APP_URL=$VITE_APP_URL
 ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
+ENV VITE_CONVEX_SITE_URL=$VITE_CONVEX_SITE_URL
 
 COPY package.json bun.lock tsconfig.json vite.config.ts ./
 COPY src ./src

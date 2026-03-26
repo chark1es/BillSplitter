@@ -12,6 +12,7 @@ services:
       args:
         VITE_APP_URL: ${VITE_APP_URL}
         VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+        VITE_CONVEX_SITE_URL: ${VITE_CONVEX_SITE_URL}
     env_file:
       - .env
     environment:

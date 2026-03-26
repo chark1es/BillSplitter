@@ -27,7 +27,26 @@ const splitCsv = (value?: string) =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const deriveConvexSiteUrl = (convexUrl?: string) => {
+  if (!convexUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(convexUrl);
+    if (!parsed.hostname.endsWith(".convex.cloud")) {
+      return null;
+    }
+
+    parsed.hostname = parsed.hostname.replace(/\.convex\.cloud$/, ".convex.site");
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+};
+
 const getServerAuthEnv = () => ({
+  convexUrl: process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL,
   appUrl:
     process.env.BETTER_AUTH_URL ??
     process.env.VITE_APP_URL ??
@@ -37,7 +56,10 @@ const getServerAuthEnv = () => ({
   googleClientSecret:
     process.env.GOOGLE_CLIENT_SECRET ?? "google-client-secret",
   convexSiteUrl:
-    process.env.VITE_CONVEX_SITE_URL ?? process.env.CONVEX_SITE_URL,
+    process.env.VITE_CONVEX_SITE_URL ??
+    process.env.CONVEX_SITE_URL ??
+    deriveConvexSiteUrl(process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL) ??
+    undefined,
   trustedOrigins: splitCsv(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
 });
 
