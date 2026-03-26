@@ -21,6 +21,12 @@ const TEST_VIEWER = {
   image: null,
 };
 
+const splitCsv = (value?: string) =>
+  (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
 const getServerAuthEnv = () => ({
   appUrl:
     process.env.BETTER_AUTH_URL ??
@@ -32,6 +38,7 @@ const getServerAuthEnv = () => ({
     process.env.GOOGLE_CLIENT_SECRET ?? "google-client-secret",
   convexSiteUrl:
     process.env.VITE_CONVEX_SITE_URL ?? process.env.CONVEX_SITE_URL,
+  trustedOrigins: splitCsv(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
 });
 
 export const isAuthBypassEnabled = () => {
@@ -46,7 +53,7 @@ export const createAuth = (ctx: Parameters<typeof authComponent.adapter>[0]) => 
     baseURL: env.appUrl,
     basePath: "/api/auth",
     secret: env.secret,
-    trustedOrigins: [env.appUrl, env.convexSiteUrl].filter(
+    trustedOrigins: [env.appUrl, env.convexSiteUrl, ...env.trustedOrigins].filter(
       (value): value is string => Boolean(value),
     ),
     database: authComponent.adapter(ctx),
