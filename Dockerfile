@@ -24,4 +24,4 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Respect Dokploy / platform `PORT`; default 3000.
-CMD ["sh", "-c", "exec bun run preview -- --host 0.0.0.0 --port \"${PORT}\""]
+CMD ["sh", "-c", "exec bun run start"]

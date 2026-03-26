@@ -9,6 +9,7 @@
     "codegen": "bunx convex codegen --init --typecheck disable",
     "dev": "vite dev --port 3000",
     "build": "vite build",
+    "start": "bun server.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "convex:dev": "bunx convex dev"
