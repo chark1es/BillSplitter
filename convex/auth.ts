@@ -51,9 +51,11 @@ const deriveConvexSiteUrl = (convexUrl?: string) => {
 const getServerAuthEnv = () => ({
   convexUrl: process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL,
   appUrl:
-    (isLocalhostUrl(process.env.BETTER_AUTH_URL) && process.env.APP_PUBLIC_URL
-      ? process.env.APP_PUBLIC_URL
+    (isLocalhostUrl(process.env.BETTER_AUTH_URL) &&
+    (process.env.APP_PUBLIC_URL || process.env.SITE_URL)
+      ? process.env.APP_PUBLIC_URL ?? process.env.SITE_URL
       : process.env.BETTER_AUTH_URL) ??
+    process.env.SITE_URL ??
     process.env.APP_PUBLIC_URL ??
     process.env.VITE_APP_URL ??
     FALLBACK_APP_URL,
@@ -66,7 +68,12 @@ const getServerAuthEnv = () => ({
     process.env.CONVEX_SITE_URL ??
     deriveConvexSiteUrl(process.env.VITE_CONVEX_URL ?? process.env.CONVEX_URL) ??
     undefined,
-  trustedOrigins: splitCsv(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+  trustedOrigins: [
+    ...splitCsv(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+    process.env.SITE_URL,
+    process.env.APP_PUBLIC_URL,
+    process.env.VITE_APP_URL,
+  ].filter((value): value is string => Boolean(value?.trim())),
 });
 
 export const isAuthBypassEnabled = () => {
