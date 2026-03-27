@@ -1,11 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { authClient } from "../../lib/auth/auth-client";
-import { getViewerSession } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
 
 export function LoginPage({ redirectTo }: { redirectTo?: string }) {
-  const navigate = useNavigate();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isResolvingSession, setIsResolvingSession] = useState(false);
@@ -47,50 +44,16 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       return;
     }
 
-    let cancelled = false;
-
-    const resolveSession = async () => {
-      try {
-        setIsResolvingSession(true);
-        const viewerSession = await getViewerSession();
-        if (cancelled) {
-          return;
-        }
-
-        if (viewerSession.isAuthenticated && viewerSession.allowed) {
-          await navigate({ to: redirectTo || "/dashboard" });
-          return;
-        }
-
-        if (viewerSession.isAuthenticated && !viewerSession.allowed) {
-          await navigate({ to: "/access-denied" });
-          return;
-        }
-
-        setErrorMessage(
-          "Google sign-in completed, but the app could not finish loading your session.",
-        );
-      } catch (error) {
-        if (!cancelled) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Could not finish Google sign-in.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsResolvingSession(false);
-        }
-      }
-    };
-
-    void resolveSession();
+    setIsResolvingSession(true);
+    const redirectTarget = redirectTo || "/dashboard";
+    const timer = window.setTimeout(() => {
+      window.location.assign(redirectTarget);
+    }, 150);
 
     return () => {
-      cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [isResolvingSession, navigate, redirectTo, session?.session]);
+  }, [isResolvingSession, redirectTo, session?.session]);
 
   return (
     <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">
