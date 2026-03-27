@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authClient } from "../../lib/auth/auth-client";
+import { getDebugAuthSnapshot } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
 
 export function LoginPage({ redirectTo }: { redirectTo?: string }) {
@@ -146,6 +147,52 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     }).catch(() => {});
     // #endregion
   }, [isSessionPending, sessionError]);
+
+  useEffect(() => {
+    getDebugAuthSnapshot()
+      .then((snapshot) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "pre-fix",
+            hypothesisId: "H10,H11,H12",
+            location: "src/features/auth/login-page.tsx:95",
+            message: "Server auth snapshot from login page",
+            data: snapshot,
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      })
+      .catch((error) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "pre-fix",
+            hypothesisId: "H10,H11,H12",
+            location: "src/features/auth/login-page.tsx:112",
+            message: "Server auth snapshot request failed",
+            data: {
+              errorMessage: error instanceof Error ? error.message : "unknown",
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      });
+  }, []);
 
   return (
     <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">

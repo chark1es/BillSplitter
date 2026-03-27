@@ -186,3 +186,49 @@ export const getBillSnapshot = createServerFn({ method: "POST" })
       return null;
     }
   });
+
+export const getDebugAuthSnapshot = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const env = getServerEnv();
+    const configured =
+      hasConfiguredConvex(env.convexUrl) && hasConfiguredConvex(env.convexSiteUrl);
+    if (!configured) {
+      return {
+        configured: false,
+        appUrl: env.appUrl,
+        convexUrl: env.convexUrl,
+        convexSiteUrl: env.convexSiteUrl,
+        hasToken: false,
+        hasViewer: false,
+        errorMessage: null as string | null,
+      };
+    }
+
+    const auth = getServerAuth();
+    try {
+      const [initialToken, viewer] = await Promise.all([
+        auth.getToken(),
+        auth.fetchAuthQuery(api.auth.viewer, {}),
+      ]);
+      return {
+        configured: true,
+        appUrl: env.appUrl,
+        convexUrl: env.convexUrl,
+        convexSiteUrl: env.convexSiteUrl,
+        hasToken: Boolean(initialToken),
+        hasViewer: Boolean(viewer),
+        errorMessage: null as string | null,
+      };
+    } catch (error) {
+      return {
+        configured: true,
+        appUrl: env.appUrl,
+        convexUrl: env.convexUrl,
+        convexSiteUrl: env.convexSiteUrl,
+        hasToken: false,
+        hasViewer: false,
+        errorMessage: error instanceof Error ? error.message : "unknown",
+      };
+    }
+  },
+);
