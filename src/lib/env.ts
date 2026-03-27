@@ -85,7 +85,7 @@ export const getServerEnv = () => {
     deriveConvexSiteUrl(convexUrl) ??
     FALLBACK_CONVEX_SITE_URL;
 
-  return {
+  const resolved = {
     convexUrl,
     convexSiteUrl,
     appUrl:
@@ -105,4 +105,30 @@ export const getServerEnv = () => {
     googleClientSecret:
       process.env.GOOGLE_CLIENT_SECRET ?? "google-client-secret",
   };
+
+  // #region agent log
+  fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "5a9cfe",
+    },
+    body: JSON.stringify({
+      sessionId: "5a9cfe",
+      runId: "pre-fix",
+      hypothesisId: "H1,H2,H3",
+      location: "src/lib/env.ts:88",
+      message: "Resolved server env (sanitized)",
+      data: {
+        appUrl: resolved.appUrl,
+        convexUrl: resolved.convexUrl,
+        convexSiteUrl: resolved.convexSiteUrl,
+        hasTrustedOrigins: Boolean(process.env.BETTER_AUTH_TRUSTED_ORIGINS),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+
+  return resolved;
 };

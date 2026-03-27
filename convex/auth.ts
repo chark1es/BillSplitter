@@ -76,6 +76,29 @@ export const isAuthBypassEnabled = () => {
 
 export const createAuth = (ctx: Parameters<typeof authComponent.adapter>[0]) => {
   const env = getServerAuthEnv();
+  // #region agent log
+  fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "5a9cfe",
+    },
+    body: JSON.stringify({
+      sessionId: "5a9cfe",
+      runId: "pre-fix",
+      hypothesisId: "H1,H3",
+      location: "convex/auth.ts:78",
+      message: "Convex Better Auth env resolved (sanitized)",
+      data: {
+        appUrl: env.appUrl,
+        convexUrl: env.convexUrl ?? null,
+        convexSiteUrl: env.convexSiteUrl ?? null,
+        trustedOriginsCount: env.trustedOrigins.length,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 
   return betterAuth({
     baseURL: env.appUrl,
