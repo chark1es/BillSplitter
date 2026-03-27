@@ -61,6 +61,27 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
     }).catch(() => {});
     // #endregion
     if (!hasConfiguredConvex(env.convexUrl) || !hasConfiguredConvex(env.convexSiteUrl)) {
+      // #region agent log
+      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5a9cfe",
+        },
+        body: JSON.stringify({
+          sessionId: "5a9cfe",
+          runId: "pre-fix",
+          hypothesisId: "H16",
+          location: "src/lib/auth/session.functions.ts:43",
+          message: "Returning empty session: convex not configured",
+          data: {
+            convexUrl: env.convexUrl,
+            convexSiteUrl: env.convexSiteUrl,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return emptySession;
     }
 
@@ -118,7 +139,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
           }).catch(() => {});
           // #endregion
         }
-        return {
+        const deniedResult = {
           user: null,
           deniedProfile: {
             id: viewer.id,
@@ -132,6 +153,29 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
           isBypassMode: false,
           initialToken,
         };
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "pre-fix",
+            hypothesisId: "H16",
+            location: "src/lib/auth/session.functions.ts:95",
+            message: "Returning denied viewer session",
+            data: {
+              isAuthenticated: deniedResult.isAuthenticated,
+              allowed: deniedResult.allowed,
+              hasInitialToken: Boolean(deniedResult.initialToken),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        return deniedResult;
       }
 
       let initialToken: string | null = null;
@@ -160,7 +204,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
         // #endregion
       }
 
-      return {
+      const allowedResult = {
         user: {
           id: viewer.id,
           name: viewer.name,
@@ -174,6 +218,29 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
         isBypassMode: false,
         initialToken,
       };
+      // #region agent log
+      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5a9cfe",
+        },
+        body: JSON.stringify({
+          sessionId: "5a9cfe",
+          runId: "pre-fix",
+          hypothesisId: "H16",
+          location: "src/lib/auth/session.functions.ts:131",
+          message: "Returning allowed viewer session",
+          data: {
+            isAuthenticated: allowedResult.isAuthenticated,
+            allowed: allowedResult.allowed,
+            hasInitialToken: Boolean(allowedResult.initialToken),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      return allowedResult;
     } catch (error) {
       // #region agent log
       fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
@@ -196,6 +263,24 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
       }).catch(() => {});
       // #endregion
       console.error("getViewerSession failed", error);
+      // #region agent log
+      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5a9cfe",
+        },
+        body: JSON.stringify({
+          sessionId: "5a9cfe",
+          runId: "pre-fix",
+          hypothesisId: "H16",
+          location: "src/lib/auth/session.functions.ts:152",
+          message: "Returning empty session from catch",
+          data: {},
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return emptySession;
     }
   },
