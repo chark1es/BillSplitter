@@ -17,7 +17,7 @@ COPY public ./public
 COPY convex ./convex
 
 RUN bun install --frozen-lockfile
-RUN bun run build
+RUN rm -rf dist && bun run build
 
 ENV NODE_ENV=production
 ENV PORT=3000

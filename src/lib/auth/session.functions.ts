@@ -85,7 +85,8 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
         isBypassMode: false,
         initialToken: initialToken ?? null,
       };
-    } catch {
+    } catch (error) {
+      console.error("getViewerSession failed", error);
       return emptySession;
     }
   },
