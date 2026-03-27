@@ -2,7 +2,7 @@ import { createClient } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { betterAuth } from "better-auth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { query } from "./_generated/server";
+import { internalAction, query } from "./_generated/server";
 import { components } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
@@ -101,6 +101,19 @@ export const createAuth = (ctx: Parameters<typeof authComponent.adapter>[0]) => 
     plugins: [convex({ authConfig })],
   });
 };
+
+/**
+ * Internal action to get the latest JWKS for production setup.
+ * Run this to generate and set JWKS in production:
+ * npx convex run auth:getLatestJwks --prod | npx convex env set JWKS --prod
+ */
+export const getLatestJwks = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const auth = createAuth(ctx);
+    return await auth.api.getLatestJwks();
+  },
+});
 
 type AuthReaderCtx = QueryCtx | MutationCtx;
 
