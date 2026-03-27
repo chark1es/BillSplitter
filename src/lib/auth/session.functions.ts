@@ -217,6 +217,8 @@ export const getDebugAuthSnapshot = createServerFn({ method: "GET" }).handler(
         convexSiteUrl: env.convexSiteUrl,
         hasToken: Boolean(initialToken),
         hasViewer: Boolean(viewer),
+        viewerAllowed: viewer?.allowed ?? null,
+        viewerIsAdmin: viewer?.isAdmin ?? null,
         errorMessage: null as string | null,
       };
     } catch (error) {
@@ -227,6 +229,8 @@ export const getDebugAuthSnapshot = createServerFn({ method: "GET" }).handler(
         convexSiteUrl: env.convexSiteUrl,
         hasToken: false,
         hasViewer: false,
+        viewerAllowed: null as boolean | null,
+        viewerIsAdmin: null as boolean | null,
         errorMessage: error instanceof Error ? error.message : "unknown",
       };
     }
