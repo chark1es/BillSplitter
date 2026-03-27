@@ -66,10 +66,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
 
     const auth = getServerAuth();
     try {
-      const [viewer, initialToken] = await Promise.all([
-        auth.fetchAuthQuery(api.auth.viewer, {}),
-        auth.getToken(),
-      ]);
+      const viewer = await auth.fetchAuthQuery(api.auth.viewer, {});
 
       if (!viewer) {
         // #region agent log
@@ -96,6 +93,31 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
       }
 
       if (!viewer.allowed) {
+        let initialToken: string | null = null;
+        try {
+          initialToken = (await auth.getToken()) ?? null;
+        } catch (error) {
+          // #region agent log
+          fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "5a9cfe",
+            },
+            body: JSON.stringify({
+              sessionId: "5a9cfe",
+              runId: "post-fix",
+              hypothesisId: "H15",
+              location: "src/lib/auth/session.functions.ts:58",
+              message: "Token fetch failed for denied viewer, continuing without token",
+              data: {
+                errorMessage: error instanceof Error ? error.message : "unknown",
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+        }
         return {
           user: null,
           deniedProfile: {
@@ -108,8 +130,34 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
           allowed: false,
           isAdmin: false,
           isBypassMode: false,
-          initialToken: initialToken ?? null,
+          initialToken,
         };
+      }
+
+      let initialToken: string | null = null;
+      try {
+        initialToken = (await auth.getToken()) ?? null;
+      } catch (error) {
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "post-fix",
+            hypothesisId: "H15",
+            location: "src/lib/auth/session.functions.ts:88",
+            message: "Token fetch failed for allowed viewer, continuing without token",
+            data: {
+              errorMessage: error instanceof Error ? error.message : "unknown",
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
       }
 
       return {
@@ -124,7 +172,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
         allowed: true,
         isAdmin: viewer.isAdmin,
         isBypassMode: false,
-        initialToken: initialToken ?? null,
+        initialToken,
       };
     } catch (error) {
       // #region agent log
