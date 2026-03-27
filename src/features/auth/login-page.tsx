@@ -136,11 +136,71 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
 
     setIsResolvingSession(true);
     const redirectTarget = redirectTo || "/dashboard";
+    // #region agent log
+    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "5a9cfe",
+      },
+      body: JSON.stringify({
+        sessionId: "5a9cfe",
+        runId: "pre-fix",
+        hypothesisId: "H18",
+        location: "src/features/auth/login-page.tsx:76",
+        message: "Scheduling post-login redirect timer",
+        data: {
+          redirectTarget,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     const timer = window.setTimeout(() => {
+      // #region agent log
+      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5a9cfe",
+        },
+        body: JSON.stringify({
+          sessionId: "5a9cfe",
+          runId: "pre-fix",
+          hypothesisId: "H18",
+          location: "src/features/auth/login-page.tsx:85",
+          message: "Redirect timer fired",
+          data: {
+            redirectTarget,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       window.location.assign(redirectTarget);
     }, 150);
 
     return () => {
+      // #region agent log
+      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5a9cfe",
+        },
+        body: JSON.stringify({
+          sessionId: "5a9cfe",
+          runId: "pre-fix",
+          hypothesisId: "H18",
+          location: "src/features/auth/login-page.tsx:102",
+          message: "Clearing post-login redirect timer",
+          data: {
+            redirectTarget,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       window.clearTimeout(timer);
     };
   }, [isResolvingSession, redirectTo, session?.session]);
