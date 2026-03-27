@@ -8,6 +8,9 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const config = defineConfig({
+  ssr: {
+    noExternal: ['@convex-dev/better-auth'],
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,

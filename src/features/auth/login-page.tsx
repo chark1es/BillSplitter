@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { authClient } from "../../lib/auth/auth-client";
+import { getViewerSession } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
 
 export function LoginPage({ redirectTo }: { redirectTo?: string }) {
+  const navigate = useNavigate();
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isResolvingSession, setIsResolvingSession] = useState(false);
+  const { data: session } = authClient.useSession();
   const envConfigured = hasConfiguredConvex(getPublicEnv().convexUrl);
   const features = [
     {
@@ -36,6 +41,56 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       setIsPending(false);
     }
   };
+
+  useEffect(() => {
+    if (!session?.session || isResolvingSession) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveSession = async () => {
+      try {
+        setIsResolvingSession(true);
+        const viewerSession = await getViewerSession();
+        if (cancelled) {
+          return;
+        }
+
+        if (viewerSession.isAuthenticated && viewerSession.allowed) {
+          await navigate({ to: redirectTo || "/dashboard" });
+          return;
+        }
+
+        if (viewerSession.isAuthenticated && !viewerSession.allowed) {
+          await navigate({ to: "/access-denied" });
+          return;
+        }
+
+        setErrorMessage(
+          "Google sign-in completed, but the app could not finish loading your session.",
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Could not finish Google sign-in.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsResolvingSession(false);
+        }
+      }
+    };
+
+    void resolveSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isResolvingSession, navigate, redirectTo, session?.session]);
 
   return (
     <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">
@@ -72,13 +127,17 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
         ) : null}
         <button
           className="primary-button mt-6 w-full justify-center text-base"
-          disabled={isPending}
+          disabled={isPending || isResolvingSession}
           onClick={handleGoogleSignIn}
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/18 text-base sm:h-10 sm:w-10 sm:text-lg">
             G
           </span>
-          {isPending ? "Redirecting to Google..." : "Sign in with Google"}
+          {isPending
+            ? "Redirecting to Google..."
+            : isResolvingSession
+              ? "Finishing sign-in..."
+              : "Sign in with Google"}
         </button>
         <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
           Callback target: <span className="font-semibold text-[var(--ink)]">{redirectTo || "/dashboard"}</span>
