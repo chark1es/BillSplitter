@@ -139,27 +139,96 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     hasTriggeredRedirectRef.current = true;
     setIsResolvingSession(true);
     const redirectTarget = redirectTo || "/dashboard";
-    // #region agent log
-    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "5a9cfe",
-      },
-      body: JSON.stringify({
-        sessionId: "5a9cfe",
-        runId: "post-fix",
-        hypothesisId: "H18",
-        location: "src/features/auth/login-page.tsx:79",
-        message: "Triggering immediate post-login redirect",
-        data: {
-          redirectTarget,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    window.location.assign(redirectTarget);
+    let cancelled = false;
+
+    getDebugAuthSnapshot()
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "post-fix",
+            hypothesisId: "H21",
+            location: "src/features/auth/login-page.tsx:81",
+            message: "Post-login redirect gate snapshot",
+            data: {
+              hasViewer: snapshot.hasViewer,
+              viewerAllowed: snapshot.viewerAllowed,
+              hasToken: snapshot.hasToken,
+              redirectTarget,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+
+        if (snapshot.hasViewer && snapshot.viewerAllowed !== false) {
+          // #region agent log
+          fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "5a9cfe",
+            },
+            body: JSON.stringify({
+              sessionId: "5a9cfe",
+              runId: "post-fix",
+              hypothesisId: "H21",
+              location: "src/features/auth/login-page.tsx:104",
+              message: "Redirecting after server-auth confirmation",
+              data: {
+                redirectTarget,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+          window.location.assign(redirectTarget);
+          return;
+        }
+
+        hasTriggeredRedirectRef.current = false;
+        setIsResolvingSession(false);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "post-fix",
+            hypothesisId: "H21",
+            location: "src/features/auth/login-page.tsx:129",
+            message: "Post-login redirect gate failed",
+            data: {
+              errorMessage: error instanceof Error ? error.message : "unknown",
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        hasTriggeredRedirectRef.current = false;
+        setIsResolvingSession(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isResolvingSession, redirectTo, session?.session]);
 
   useEffect(() => {
