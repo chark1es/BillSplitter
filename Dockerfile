@@ -11,6 +11,7 @@ ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 ENV VITE_CONVEX_SITE_URL=$VITE_CONVEX_SITE_URL
 
 COPY package.json bun.lock tsconfig.json vite.config.ts ./
+COPY server.mjs ./
 COPY src ./src
 COPY public ./public
 COPY convex ./convex
