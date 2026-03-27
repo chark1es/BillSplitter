@@ -3,6 +3,7 @@ import { authComponent, createAuth } from "./auth";
 
 const http = httpRouter();
 
-authComponent.registerRoutes(http, createAuth);
+// Enable CORS for client-side authentication requests
+authComponent.registerRoutes(http, createAuth, { cors: true });
 
 export default http;
