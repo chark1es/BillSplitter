@@ -105,7 +105,32 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       }),
     }).catch(() => {});
     // #endregion
-    if (!session?.session || isResolvingSession) {
+    if (!session?.session) {
+      if (isResolvingSession) {
+        // #region agent log
+        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5a9cfe",
+          },
+          body: JSON.stringify({
+            sessionId: "5a9cfe",
+            runId: "post-fix",
+            hypothesisId: "H14",
+            location: "src/features/auth/login-page.tsx:50",
+            message: "Resetting resolving state after session loss",
+            data: {},
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+        setIsResolvingSession(false);
+      }
+      return;
+    }
+
+    if (isResolvingSession) {
       return;
     }
 
