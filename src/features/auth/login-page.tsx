@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "../../lib/auth/auth-client";
 import { getDebugAuthSnapshot } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
@@ -7,6 +7,7 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isResolvingSession, setIsResolvingSession] = useState(false);
+  const hasTriggeredRedirectRef = useRef(false);
   const { data: session, error: sessionError, isPending: isSessionPending } =
     authClient.useSession();
   const envConfigured = hasConfiguredConvex(getPublicEnv().convexUrl);
@@ -106,6 +107,7 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     }).catch(() => {});
     // #endregion
     if (!session?.session) {
+      hasTriggeredRedirectRef.current = false;
       if (isResolvingSession) {
         // #region agent log
         fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
@@ -130,10 +132,11 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       return;
     }
 
-    if (isResolvingSession) {
+    if (isResolvingSession || hasTriggeredRedirectRef.current) {
       return;
     }
 
+    hasTriggeredRedirectRef.current = true;
     setIsResolvingSession(true);
     const redirectTarget = redirectTo || "/dashboard";
     // #region agent log
@@ -145,10 +148,10 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       },
       body: JSON.stringify({
         sessionId: "5a9cfe",
-        runId: "pre-fix",
+        runId: "post-fix",
         hypothesisId: "H18",
-        location: "src/features/auth/login-page.tsx:76",
-        message: "Scheduling post-login redirect timer",
+        location: "src/features/auth/login-page.tsx:79",
+        message: "Triggering immediate post-login redirect",
         data: {
           redirectTarget,
         },
@@ -156,53 +159,7 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       }),
     }).catch(() => {});
     // #endregion
-    const timer = window.setTimeout(() => {
-      // #region agent log
-      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "5a9cfe",
-        },
-        body: JSON.stringify({
-          sessionId: "5a9cfe",
-          runId: "pre-fix",
-          hypothesisId: "H18",
-          location: "src/features/auth/login-page.tsx:85",
-          message: "Redirect timer fired",
-          data: {
-            redirectTarget,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      window.location.assign(redirectTarget);
-    }, 150);
-
-    return () => {
-      // #region agent log
-      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "5a9cfe",
-        },
-        body: JSON.stringify({
-          sessionId: "5a9cfe",
-          runId: "pre-fix",
-          hypothesisId: "H18",
-          location: "src/features/auth/login-page.tsx:102",
-          message: "Clearing post-login redirect timer",
-          data: {
-            redirectTarget,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      window.clearTimeout(timer);
-    };
+    window.location.assign(redirectTarget);
   }, [isResolvingSession, redirectTo, session?.session]);
 
   useEffect(() => {
