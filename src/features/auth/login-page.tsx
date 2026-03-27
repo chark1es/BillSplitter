@@ -139,13 +139,8 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     hasTriggeredRedirectRef.current = true;
     setIsResolvingSession(true);
     const redirectTarget = redirectTo || "/dashboard";
-    let cancelled = false;
-
     getDebugAuthSnapshot()
       .then((snapshot) => {
-        if (cancelled) {
-          return;
-        }
         // #region agent log
         fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
           method: "POST",
@@ -199,9 +194,6 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
         setIsResolvingSession(false);
       })
       .catch((error) => {
-        if (cancelled) {
-          return;
-        }
         // #region agent log
         fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
           method: "POST",
@@ -225,11 +217,7 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
         hasTriggeredRedirectRef.current = false;
         setIsResolvingSession(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isResolvingSession, redirectTo, session?.session]);
+  }, [redirectTo, session?.session]);
 
   useEffect(() => {
     if (!sessionError) {
