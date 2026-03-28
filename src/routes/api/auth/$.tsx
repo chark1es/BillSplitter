@@ -10,6 +10,17 @@ const PROXIED_AUTH_HEADERS = [
   "origin",
   "referer",
   "user-agent",
+  // Fetch metadata (Better Auth CSRF / origin checks)
+  "sec-fetch-site",
+  "sec-fetch-mode",
+  "sec-fetch-dest",
+  // Preserve client IP / edge context for upstream (Convex sits behind CF too)
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "cf-connecting-ip",
+  "cf-ray",
+  "true-client-ip",
 ] as const;
 
 const APP_DOMAIN_CONVEX_JWT_COOKIE_NAMES = [
@@ -64,6 +75,18 @@ const forwardAuthRequest = async (request: Request) => {
     }
   }
 
+  // Ensure upstream sees the public app host when the runtime did not add XFH (common behind proxies).
+  const publicUrl = new URL(request.url);
+  if (!headers.has("x-forwarded-host")) {
+    headers.set("x-forwarded-host", publicUrl.host);
+  }
+  if (!headers.has("x-forwarded-proto")) {
+    headers.set(
+      "x-forwarded-proto",
+      publicUrl.protocol === "https:" ? "https" : "http",
+    );
+  }
+
   headers.set("accept-encoding", "identity");
   headers.set("host", targetHost);
 
@@ -78,6 +101,32 @@ const forwardAuthRequest = async (request: Request) => {
     // @ts-expect-error duplex is required for streaming request bodies in modern fetch
     duplex: "half",
   });
+
+  // #region agent log
+  if (upstreamResponse.status === 403) {
+    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "243623",
+      },
+      body: JSON.stringify({
+        sessionId: "243623",
+        hypothesisId: "H-upstream-cf403",
+        location: "src/routes/api/auth/$.tsx:forwardAuthRequest",
+        message: "Upstream Convex auth returned 403",
+        data: {
+          pathname: upstreamUrl.pathname,
+          targetHost,
+          contentType: upstreamResponse.headers.get("content-type"),
+          forwardedHost: headers.get("x-forwarded-host"),
+          forwardedProto: headers.get("x-forwarded-proto"),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
 
   const responseHeaders = new Headers(upstreamResponse.headers);
   const setCookieHeaders = getSetCookieHeaders(upstreamResponse.headers);
