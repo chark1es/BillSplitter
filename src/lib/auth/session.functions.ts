@@ -19,7 +19,8 @@ const isBypassMode = () => {
   return ["1", "true", "yes", "on"].includes(value);
 };
 
-export const getViewerSession = createServerFn({ method: "GET" }).handler(
+// This depends on request cookies, so keep it non-cacheable across navigations.
+export const getViewerSession = createServerFn({ method: "POST" }).handler(
   async () => {
     if (isBypassMode()) {
       return {
@@ -103,9 +104,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
             hypothesisId: "H5",
             location: "src/lib/auth/session.functions.ts:53",
             message: "Viewer missing despite auth call",
-            data: {
-              hasInitialToken: Boolean(initialToken),
-            },
+            data: {},
             timestamp: Date.now(),
           }),
         }).catch(() => {});
@@ -286,7 +285,7 @@ export const getViewerSession = createServerFn({ method: "GET" }).handler(
   },
 );
 
-export const getDashboardSnapshot = createServerFn({ method: "GET" }).handler(
+export const getDashboardSnapshot = createServerFn({ method: "POST" }).handler(
   async () => {
     const env = getServerEnv();
     if (!hasConfiguredConvex(env.convexUrl) || !hasConfiguredConvex(env.convexSiteUrl)) {
@@ -320,7 +319,7 @@ export const getBillSnapshot = createServerFn({ method: "POST" })
     }
   });
 
-export const getDebugAuthSnapshot = createServerFn({ method: "GET" }).handler(
+export const getDebugAuthSnapshot = createServerFn({ method: "POST" }).handler(
   async () => {
     const env = getServerEnv();
     const configured =

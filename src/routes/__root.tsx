@@ -17,8 +17,11 @@ import type { RouterContext } from "../lib/router-context";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  beforeLoad: async () => {
+  beforeLoad: async (ctx) => {
     const auth = await getViewerSession();
+    if (auth.initialToken) {
+      ctx.context.convexQueryClient.serverHttpClient?.setAuth(auth.initialToken);
+    }
     // #region agent log
     fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
       method: "POST",
