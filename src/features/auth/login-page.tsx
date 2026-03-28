@@ -139,84 +139,10 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     hasTriggeredRedirectRef.current = true;
     setIsResolvingSession(true);
     const redirectTarget = redirectTo || "/dashboard";
-    getDebugAuthSnapshot()
-      .then((snapshot) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "post-fix",
-            hypothesisId: "H21",
-            location: "src/features/auth/login-page.tsx:81",
-            message: "Post-login redirect gate snapshot",
-            data: {
-              hasViewer: snapshot.hasViewer,
-              viewerAllowed: snapshot.viewerAllowed,
-              hasToken: snapshot.hasToken,
-              redirectTarget,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-
-        if (snapshot.hasViewer && snapshot.viewerAllowed !== false) {
-          // #region agent log
-          fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "5a9cfe",
-            },
-            body: JSON.stringify({
-              sessionId: "5a9cfe",
-              runId: "post-fix",
-              hypothesisId: "H21",
-              location: "src/features/auth/login-page.tsx:104",
-              message: "Redirecting after server-auth confirmation",
-              data: {
-                redirectTarget,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
-          window.location.assign(redirectTarget);
-          return;
-        }
-
-        hasTriggeredRedirectRef.current = false;
-        setIsResolvingSession(false);
-      })
-      .catch((error) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "post-fix",
-            hypothesisId: "H21",
-            location: "src/features/auth/login-page.tsx:129",
-            message: "Post-login redirect gate failed",
-            data: {
-              errorMessage: error instanceof Error ? error.message : "unknown",
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-        hasTriggeredRedirectRef.current = false;
-        setIsResolvingSession(false);
-      });
+    // Session from Better Auth is authoritative after OAuth. Do not gate redirect on getDebugAuthSnapshot:
+    // it races with Convex JWT/viewer and left users stuck on /login with a truthy useSession(), then a
+    // second sign-in hammered /api/auth/* and tripped Cloudflare 403 HTML.
+    window.location.assign(redirectTarget);
   }, [redirectTo, session?.session]);
 
   useEffect(() => {
