@@ -23,28 +23,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     if (auth.initialToken) {
       ctx.context.convexQueryClient.serverHttpClient?.setAuth(auth.initialToken);
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "5a9cfe",
-      },
-      body: JSON.stringify({
-        sessionId: "5a9cfe",
-        runId: "pre-fix",
-        hypothesisId: "H17",
-        location: "src/routes/__root.tsx:20",
-        message: "Root beforeLoad auth snapshot",
-        data: {
-          isAuthenticated: auth.isAuthenticated,
-          allowed: auth.allowed,
-          hasInitialToken: Boolean(auth.initialToken),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return { auth };
   },
   head: () => ({

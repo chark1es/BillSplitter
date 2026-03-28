@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { authClient } from "../../lib/auth/auth-client";
-import { getDebugAuthSnapshot } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
 
 export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { error: sessionError, isPending: isSessionPending } = authClient.useSession();
   const envConfigured = hasConfiguredConvex(getPublicEnv().convexUrl);
   const features = [
     {
@@ -27,52 +25,11 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     try {
       setIsPending(true);
       setErrorMessage(null);
-      // #region agent log
-      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "5a9cfe",
-        },
-        body: JSON.stringify({
-          sessionId: "5a9cfe",
-          runId: "pre-fix",
-          hypothesisId: "H4",
-          location: "src/features/auth/login-page.tsx:30",
-          message: "Starting social sign-in",
-          data: {
-            callbackURL: redirectTo || "/dashboard",
-            origin: typeof window === "undefined" ? null : window.location.origin,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       await authClient.signIn.social({
         provider: "google",
         callbackURL: redirectTo || "/dashboard",
       });
     } catch (error) {
-      // #region agent log
-      fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "5a9cfe",
-        },
-        body: JSON.stringify({
-          sessionId: "5a9cfe",
-          runId: "pre-fix",
-          hypothesisId: "H7,H8,H9",
-          location: "src/features/auth/login-page.tsx:35",
-          message: "Social sign-in request failed",
-          data: {
-            errorMessage: error instanceof Error ? error.message : "unknown",
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start Google sign-in.",
       );
@@ -83,80 +40,6 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   // Do not redirect from the client when useSession() is truthy. That fought TanStack's login beforeLoad
   // (server getViewerSession): dashboard → unauthenticated → /login → client redirect → loop. Router redirect
   // in login.tsx runs when context.auth is already satisfied.
-
-  useEffect(() => {
-    if (!sessionError) {
-      return;
-    }
-    // #region agent log
-    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "5a9cfe",
-      },
-      body: JSON.stringify({
-        sessionId: "5a9cfe",
-        runId: "pre-fix",
-        hypothesisId: "H7,H8,H9",
-        location: "src/features/auth/login-page.tsx:62",
-        message: "Session hook error",
-        data: {
-          errorMessage:
-            sessionError instanceof Error ? sessionError.message : String(sessionError),
-          isSessionPending,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [isSessionPending, sessionError]);
-
-  useEffect(() => {
-    getDebugAuthSnapshot()
-      .then((snapshot) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "pre-fix",
-            hypothesisId: "H10,H11,H12",
-            location: "src/features/auth/login-page.tsx:95",
-            message: "Server auth snapshot from login page",
-            data: snapshot,
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      })
-      .catch((error) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "pre-fix",
-            hypothesisId: "H10,H11,H12",
-            location: "src/features/auth/login-page.tsx:112",
-            message: "Server auth snapshot request failed",
-            data: {
-              errorMessage: error instanceof Error ? error.message : "unknown",
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      });
-  }, []);
 
   return (
     <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">

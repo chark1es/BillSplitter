@@ -129,33 +129,6 @@ const forwardAuthRequest = async (request: Request) => {
     dispatcher: convexUpstreamAgent,
   });
 
-  // #region agent log
-  if (upstreamResponse.status === 403) {
-    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "243623",
-      },
-      body: JSON.stringify({
-        sessionId: "243623",
-        hypothesisId: "H-upstream-cf403,H-node-ua",
-        location: "src/routes/api/auth/$.tsx:forwardAuthRequest",
-        message: "Upstream Convex auth returned 403",
-        data: {
-          pathname: upstreamUrl.pathname,
-          targetHost,
-          contentType: upstreamResponse.headers.get("content-type"),
-          forwardedHost: headers.get("x-forwarded-host"),
-          forwardedProto: headers.get("x-forwarded-proto"),
-          hadClientUserAgent: Boolean(clientUserAgent),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  }
-  // #endregion
-
   const responseHeaders = new Headers(upstreamResponse.headers);
   const setCookieHeaders = getSetCookieHeaders(upstreamResponse.headers);
   if (setCookieHeaders.length > 0) {
