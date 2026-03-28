@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "../../lib/auth/auth-client";
 import { getDebugAuthSnapshot } from "../../lib/auth/session.functions";
 import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
@@ -6,10 +6,7 @@ import { getPublicEnv, hasConfiguredConvex } from "../../lib/env";
 export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isResolvingSession, setIsResolvingSession] = useState(false);
-  const hasTriggeredRedirectRef = useRef(false);
-  const { data: session, error: sessionError, isPending: isSessionPending } =
-    authClient.useSession();
+  const { error: sessionError, isPending: isSessionPending } = authClient.useSession();
   const envConfigured = hasConfiguredConvex(getPublicEnv().convexUrl);
   const features = [
     {
@@ -83,67 +80,9 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     }
   };
 
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "5a9cfe",
-      },
-      body: JSON.stringify({
-        sessionId: "5a9cfe",
-        runId: "pre-fix",
-        hypothesisId: "H4",
-        location: "src/features/auth/login-page.tsx:43",
-        message: "Login effect state snapshot",
-        data: {
-          hasSession: Boolean(session?.session),
-          isResolvingSession,
-          redirectTo: redirectTo || "/dashboard",
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    if (!session?.session) {
-      hasTriggeredRedirectRef.current = false;
-      if (isResolvingSession) {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "post-fix",
-            hypothesisId: "H14",
-            location: "src/features/auth/login-page.tsx:50",
-            message: "Resetting resolving state after session loss",
-            data: {},
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-        setIsResolvingSession(false);
-      }
-      return;
-    }
-
-    if (isResolvingSession || hasTriggeredRedirectRef.current) {
-      return;
-    }
-
-    hasTriggeredRedirectRef.current = true;
-    setIsResolvingSession(true);
-    const redirectTarget = redirectTo || "/dashboard";
-    // Session from Better Auth is authoritative after OAuth. Do not gate redirect on getDebugAuthSnapshot:
-    // it races with Convex JWT/viewer and left users stuck on /login with a truthy useSession(), then a
-    // second sign-in hammered /api/auth/* and tripped Cloudflare 403 HTML.
-    window.location.assign(redirectTarget);
-  }, [redirectTo, session?.session]);
+  // Do not redirect from the client when useSession() is truthy. That fought TanStack's login beforeLoad
+  // (server getViewerSession): dashboard → unauthenticated → /login → client redirect → loop. Router redirect
+  // in login.tsx runs when context.auth is already satisfied.
 
   useEffect(() => {
     if (!sessionError) {
@@ -254,17 +193,13 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
         ) : null}
         <button
           className="primary-button mt-6 w-full justify-center text-base"
-          disabled={isPending || isResolvingSession}
+          disabled={isPending}
           onClick={handleGoogleSignIn}
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/18 text-base sm:h-10 sm:w-10 sm:text-lg">
             G
           </span>
-          {isPending
-            ? "Redirecting to Google..."
-            : isResolvingSession
-              ? "Finishing sign-in..."
-              : "Sign in with Google"}
+          {isPending ? "Redirecting to Google..." : "Sign in with Google"}
         </button>
         <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
           Callback target: <span className="font-semibold text-[var(--ink)]">{redirectTo || "/dashboard"}</span>
