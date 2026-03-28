@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Agent, fetch as undiciFetch } from "undici";
 import { getServerEnv } from "../../../lib/env";
+
+/** Undici fetch bypasses Bun's fetch (Bun can merge a Bun User-Agent that Cloudflare blocks on *.convex.site). IPv4-first avoids broken IPv6 paths to CF. */
+const convexUpstreamAgent = new Agent({
+  connect: { family: 4 },
+});
 
 const PROXIED_AUTH_HEADERS = [
   "accept",
@@ -98,7 +104,7 @@ const forwardAuthRequest = async (request: Request) => {
   headers.set("accept-encoding", "identity");
   headers.set("host", targetHost);
 
-  const upstreamResponse = await fetch(targetUrl, {
+  const upstreamResponse = await undiciFetch(targetUrl, {
     method: request.method,
     headers,
     redirect: "manual",
@@ -108,6 +114,7 @@ const forwardAuthRequest = async (request: Request) => {
         : request.body,
     // @ts-expect-error duplex is required for streaming request bodies in modern fetch
     duplex: "half",
+    dispatcher: convexUpstreamAgent,
   });
 
   // #region agent log

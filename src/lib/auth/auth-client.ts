@@ -14,4 +14,8 @@ const getAuthBaseUrl = () => {
 export const authClient = createAuthClient({
   baseURL: getAuthBaseUrl(),
   plugins: [convexClient()],
+  // Prod: fewer parallel hits to /api/auth/* → Node/Bun → *.convex.site (CF); bursts → intermittent 403 HTML.
+  sessionOptions: {
+    refetchOnWindowFocus: false,
+  },
 });
