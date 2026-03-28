@@ -9,7 +9,6 @@ const PROXIED_AUTH_HEADERS = [
   "cookie",
   "origin",
   "referer",
-  "user-agent",
   // Fetch metadata (Better Auth CSRF / origin checks)
   "sec-fetch-site",
   "sec-fetch-mode",
@@ -21,6 +20,10 @@ const PROXIED_AUTH_HEADERS = [
   "x-forwarded-host",
   "x-forwarded-proto",
 ] as const;
+
+/** When missing, Node's fetch uses `User-Agent: node` — often blocked by CF (bot/datacenter heuristics). */
+const UPSTREAM_USER_AGENT_FALLBACK =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 const APP_DOMAIN_CONVEX_JWT_COOKIE_NAMES = [
   "better-auth.convex_jwt",
@@ -86,6 +89,12 @@ const forwardAuthRequest = async (request: Request) => {
     );
   }
 
+  const clientUserAgent = request.headers.get("user-agent")?.trim();
+  headers.set(
+    "user-agent",
+    clientUserAgent || UPSTREAM_USER_AGENT_FALLBACK,
+  );
+
   headers.set("accept-encoding", "identity");
   headers.set("host", targetHost);
 
@@ -111,7 +120,7 @@ const forwardAuthRequest = async (request: Request) => {
       },
       body: JSON.stringify({
         sessionId: "243623",
-        hypothesisId: "H-upstream-cf403",
+        hypothesisId: "H-upstream-cf403,H-node-ua",
         location: "src/routes/api/auth/$.tsx:forwardAuthRequest",
         message: "Upstream Convex auth returned 403",
         data: {
@@ -120,6 +129,7 @@ const forwardAuthRequest = async (request: Request) => {
           contentType: upstreamResponse.headers.get("content-type"),
           forwardedHost: headers.get("x-forwarded-host"),
           forwardedProto: headers.get("x-forwarded-proto"),
+          hadClientUserAgent: Boolean(clientUserAgent),
         },
         timestamp: Date.now(),
       }),
