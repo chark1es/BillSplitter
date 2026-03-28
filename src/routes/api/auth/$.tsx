@@ -14,13 +14,12 @@ const PROXIED_AUTH_HEADERS = [
   "sec-fetch-site",
   "sec-fetch-mode",
   "sec-fetch-dest",
-  // Preserve client IP / edge context for upstream (Convex sits behind CF too)
+  // Standard forwarding only — do NOT forward cf-ray / cf-connecting-ip / true-client-ip:
+  // those belong to the browser→fairshare hop; sending them to *.convex.site (also on CF)
+  // can confuse nested Cloudflare and surface Error 1000 or bogus 403 HTML.
   "x-forwarded-for",
   "x-forwarded-host",
   "x-forwarded-proto",
-  "cf-connecting-ip",
-  "cf-ray",
-  "true-client-ip",
 ] as const;
 
 const APP_DOMAIN_CONVEX_JWT_COOKIE_NAMES = [
