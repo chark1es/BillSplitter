@@ -27,6 +27,24 @@ const splitCsv = (value?: string) =>
     .map((entry) => entry.trim())
     .filter(Boolean);
 
+const normalizeAbsoluteUrl = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+};
+
 const isLocalhostUrl = (value?: string) =>
   Boolean(value && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value));
 
@@ -46,6 +64,29 @@ const deriveConvexSiteUrl = (convexUrl?: string) => {
   } catch {
     return null;
   }
+};
+
+const getTrustedRequestOrigins = (request?: Request) => {
+  if (!request) {
+    return [];
+  }
+
+  const requestUrlOrigin = normalizeAbsoluteUrl(request.url);
+  const originHeader = normalizeAbsoluteUrl(request.headers.get("origin"));
+  const refererOrigin = normalizeAbsoluteUrl(request.headers.get("referer"));
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const forwardedOrigin =
+    forwardedHost && forwardedProto
+      ? normalizeAbsoluteUrl(`${forwardedProto}://${forwardedHost}`)
+      : null;
+
+  return [
+    requestUrlOrigin,
+    originHeader,
+    refererOrigin,
+    forwardedOrigin,
+  ].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index);
 };
 
 const getServerAuthEnv = () => ({
@@ -83,14 +124,20 @@ export const isAuthBypassEnabled = () => {
 
 export const createAuth = (ctx: Parameters<typeof authComponent.adapter>[0]) => {
   const env = getServerAuthEnv();
+  const staticTrustedOrigins = [
+    env.appUrl,
+    env.convexSiteUrl,
+    ...env.trustedOrigins,
+  ].filter((value): value is string => Boolean(value));
 
   return betterAuth({
     baseURL: env.appUrl,
     basePath: "/api/auth",
     secret: env.secret,
-    trustedOrigins: [env.appUrl, env.convexSiteUrl, ...env.trustedOrigins].filter(
-      (value): value is string => Boolean(value),
-    ),
+    trustedOrigins: (request) => [
+      ...staticTrustedOrigins,
+      ...getTrustedRequestOrigins(request),
+    ],
     database: authComponent.adapter(ctx),
     socialProviders: {
       google: {
