@@ -29,6 +29,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       {
+        title: "FairShare",
+      },
+      {
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
@@ -37,7 +40,20 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content: "#f6f2ea",
       },
       {
-        title: "FairShare",
+        name: "application-name",
+        content: "FairShare",
+      },
+      {
+        name: "apple-mobile-web-app-title",
+        content: "FairShare",
+      },
+      {
+        name: "apple-mobile-web-app-capable",
+        content: "yes",
+      },
+      {
+        name: "mobile-web-app-capable",
+        content: "yes",
       },
       {
         name: "description",

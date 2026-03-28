@@ -1,6 +1,10 @@
 {
+  "id": "/",
   "name": "FairShare",
   "short_name": "FairShare",
+  "description": "Invite-only receipt splitting: upload, assign, review, and share.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "android-chrome-192x192.png",
@@ -13,7 +17,9 @@
       "type": "image/png"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  "theme_color": "#f6f2ea",
+  "background_color": "#f6f2ea",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait"
 }
