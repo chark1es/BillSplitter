@@ -1,6 +1,6 @@
 {
-  "name": "Your App",
-  "short_name": "App",
+  "name": "FairShare",
+  "short_name": "FairShare",
   "icons": [
     {
       "src": "android-chrome-192x192.png",
