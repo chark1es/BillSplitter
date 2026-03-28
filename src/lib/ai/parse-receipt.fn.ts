@@ -3,38 +3,7 @@ import { api } from "../../../convex/_generated/api";
 import type { ParsedReceiptPayload } from "../types";
 import { getServerAuth } from "../auth/server-auth";
 import { getServerEnv, hasConfiguredConvex } from "../env";
-
-type FrankfurterLatest = {
-  amount: number;
-  base: string;
-  date: string;
-  rates: Record<string, number>;
-};
-
-async function fetchUsdRatesContext(): Promise<{
-  base: string;
-  date: string;
-  ratesToUsd: Record<string, number>;
-  note: string;
-}> {
-  try {
-    const response = await fetch("https://api.frankfurter.app/latest?from=USD");
-    const data = (await response.json()) as FrankfurterLatest;
-    return {
-      base: data.base,
-      date: data.date,
-      ratesToUsd: data.rates,
-      note: "rates are foreign currency units per 1 USD.",
-    };
-  } catch {
-    return {
-      base: "USD",
-      date: new Date().toISOString().slice(0, 10),
-      ratesToUsd: {},
-      note: "rates unavailable",
-    };
-  }
-}
+import { convertForeignToUsd, fetchUsdFxSnapshot } from "../fx/usd-fx";
 
 const defaultModel = "google/gemini-3.1-flash-lite-preview";
 
@@ -58,13 +27,6 @@ export const parseReceiptFromUrls = createServerFn({ method: "POST" })
     }
 
     const model = process.env.RECEIPT_MODEL_ID ?? defaultModel;
-    const ratesContext = await fetchUsdRatesContext();
-    const ratesContextJson = JSON.stringify({
-      base: ratesContext.base,
-      date: ratesContext.date,
-      ratesToUsd: ratesContext.ratesToUsd,
-      note: ratesContext.note,
-    });
 
     const system = `You are a receipt parser. Output strictly valid JSON matching this shape:
 {
@@ -84,6 +46,8 @@ export const parseReceiptFromUrls = createServerFn({ method: "POST" })
   "notes": string (brief)
 }
 Rules:
+- Determine "detectedCurrencyCode" from the currency actually printed on the receipt.
+- For foreign receipts, return the local ISO 4217 code used on the receipt (JPY, VND, EUR, etc.), not USD, unless the receipt is explicitly denominated in USD.
 - Use the detected currency code as the unit for every monetary value.
 - Output raw amounts in detectedCurrencyCode only. Do NOT convert amounts to USD in the model output.
 - Use "foreignName" verbatim from the receipt. Use "translatedName" as the English display name.
@@ -91,10 +55,8 @@ Rules:
 - If tax or tip cannot be separated, put 0 in taxForeignAmount/tipForeignAmount and fold into items only if clearly itemized.
 - taxTipMode: prefer "proportional" for restaurant-style splits unless the receipt suggests an even service charge for everyone.`;
 
-    const userContent = `Exchange context (USD-focused; server will convert foreign->USD using the snapshot):
-${ratesContextJson}
-
-Parse the receipt image(s). Return JSON only.`;
+    const userContent =
+      "Parse the receipt image(s). Return JSON only. The server will fetch live FX after you identify the receipt currency.";
 
     const imageParts = data.imageUrls.map((url) => ({
       type: "image_url" as const,
@@ -157,18 +119,7 @@ Parse the receipt image(s). Return JSON only.`;
     const currencyCode = String(
       parsed.detectedCurrencyCode ?? "USD",
     ).toUpperCase();
-
-    const foreignUnitsPerUsd =
-      currencyCode === "USD"
-        ? 1
-        : ratesContext.ratesToUsd[currencyCode];
-
-    if (!foreignUnitsPerUsd || foreignUnitsPerUsd <= 0) {
-      throw new Error(`Could not resolve live FX rate for ${currencyCode}.`);
-    }
-
-    const toUsd = (foreignAmount: number) =>
-      Number((foreignAmount / foreignUnitsPerUsd).toFixed(2));
+    const fxSnapshot = await fetchUsdFxSnapshot(currencyCode);
 
     const items = (parsed.items ?? []).map((item, index) => {
       const foreignName = String(item.foreignName ?? `Item ${index + 1}`);
@@ -181,7 +132,7 @@ Parse the receipt image(s). Return JSON only.`;
         foreignName,
         translatedName,
         foreignPrice: Number(foreignPrice.toFixed(2)),
-        usdPrice: toUsd(foreignPrice),
+        usdPrice: convertForeignToUsd(foreignPrice, fxSnapshot),
       };
     });
 
@@ -191,17 +142,12 @@ Parse the receipt image(s). Return JSON only.`;
     return {
       title: parsed.title,
       currencyCode,
-      fxSnapshot: {
-        baseCurrency: "USD",
-        currencyCode,
-        date: ratesContext.date,
-        foreignUnitsPerUsd,
-      },
+      fxSnapshot,
       items,
       taxForeignAmount: Number(taxForeignAmount.toFixed(2)),
       tipForeignAmount: Number(tipForeignAmount.toFixed(2)),
-      taxUsdAmount: toUsd(taxForeignAmount),
-      tipUsdAmount: toUsd(tipForeignAmount),
+      taxUsdAmount: convertForeignToUsd(taxForeignAmount, fxSnapshot),
+      tipUsdAmount: convertForeignToUsd(tipForeignAmount, fxSnapshot),
       taxTipMode: parsed.taxTipMode === "equal" ? "equal" : "proportional",
       confidence:
         typeof parsed.confidence === "number" ? parsed.confidence : undefined,

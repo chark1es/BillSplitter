@@ -113,10 +113,14 @@ export type ParsedReceiptPayload = {
   notes?: string;
 };
 
+export type FxRateSource = "currencyapi" | "frankfurter" | "parity";
+
 export type FxSnapshot = {
   baseCurrency: "USD";
   currencyCode: string;
   date: string;
   // 1 USD = `foreignUnitsPerUsd` units of `currencyCode`.
   foreignUnitsPerUsd: number;
+  lastUpdatedAt?: string;
+  rateSource?: FxRateSource;
 };

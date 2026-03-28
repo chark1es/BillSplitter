@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { BillWizardNavBar } from "./bill-wizard-nav";
+import { ExchangeRateCard } from "./exchange-rate-card";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { roundMoney } from "../../lib/drafts/local-bill-draft";
@@ -184,13 +185,21 @@ export function ItemizedReceiptStep() {
             </div>
           </div>
 
+          <ExchangeRateCard
+            onParsedReceiptChange={updateParsedReceipt}
+            parsedReceipt={parsedReceipt}
+          />
+
           <div className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="eyebrow">Line items</p>
                 <p className="text-xs text-[var(--muted)]">
                   1 USD = {parsedReceipt.fxSnapshot.foreignUnitsPerUsd}{" "}
-                  {parsedReceipt.currencyCode} (as of {parsedReceipt.fxSnapshot.date})
+                  {parsedReceipt.currencyCode} (as of{" "}
+                  {parsedReceipt.fxSnapshot.lastUpdatedAt ??
+                    parsedReceipt.fxSnapshot.date}
+                  )
                 </p>
               </div>
               <p className="text-xs text-[var(--muted)]">

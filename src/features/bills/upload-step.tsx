@@ -6,6 +6,7 @@ import { useUploadThing } from "../../lib/uploadthing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { BillWizardNavBar } from "./bill-wizard-nav";
+import { ExchangeRateCard } from "./exchange-rate-card";
 
 type PreviewRow = {
   id: string;
@@ -74,6 +75,23 @@ export function UploadStep() {
   const adjustedGrandTotalUsd = computedGrandTotalUsd - discountUsdAmount;
 
   const canProceed = Boolean(parsedReceipt) && !isParsing;
+
+  const updateParsedReceipt = (
+    updater: (
+      parsed: NonNullable<typeof parsedReceipt>,
+    ) => NonNullable<typeof parsedReceipt>,
+  ) => {
+    patchDraft((prev) => {
+      if (!prev.receipt.parsed) return prev;
+      return {
+        ...prev,
+        receipt: {
+          ...prev.receipt,
+          parsed: updater(prev.receipt.parsed),
+        },
+      };
+    });
+  };
 
   const replaceOrAddPagesWithFiles = async (
     fileList: FileList | null,
@@ -518,6 +536,11 @@ export function UploadStep() {
                   </dl>
                 </div>
               </div>
+
+              <ExchangeRateCard
+                onParsedReceiptChange={updateParsedReceipt}
+                parsedReceipt={parsedReceipt}
+              />
             </div>
           ) : null}
         </article>
