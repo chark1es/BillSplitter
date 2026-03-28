@@ -293,61 +293,6 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
       });
   }, []);
 
-  useEffect(() => {
-    if (!session?.session) {
-      return;
-    }
-
-    fetch("/api/auth/get-session", { credentials: "include" })
-      .then(async (response) => {
-        const payload = await response.text();
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "pre-fix",
-            hypothesisId: "H13",
-            location: "src/features/auth/login-page.tsx:128",
-            message: "Browser get-session check after session truthy",
-            data: {
-              status: response.status,
-              ok: response.ok,
-              bodyPreview: payload.slice(0, 250),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      })
-      .catch((error) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7365/ingest/9c6a8657-8a24-4842-90d4-de02842758e1", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5a9cfe",
-          },
-          body: JSON.stringify({
-            sessionId: "5a9cfe",
-            runId: "pre-fix",
-            hypothesisId: "H13",
-            location: "src/features/auth/login-page.tsx:149",
-            message: "Browser get-session check failed",
-            data: {
-              errorMessage: error instanceof Error ? error.message : "unknown",
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      });
-  }, [session?.session]);
-
   return (
     <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">
       <section className="hero-panel px-6 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
