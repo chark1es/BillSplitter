@@ -11,6 +11,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { AppShell } from "../components/layout/app-shell";
 import { authClient } from "../lib/auth/auth-client";
+import { getBuildMarker } from "../lib/build-info";
 import { getViewerSession } from "../lib/auth/session.functions";
 import type { RouterContext } from "../lib/router-context";
 
@@ -63,6 +64,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       {
         name: "description",
         content: "Invite-only receipt splitting: upload, assign, review, and share.",
+      },
+      {
+        name: "x-build-marker",
+        content: getBuildMarker(),
       },
     ],
     links: [

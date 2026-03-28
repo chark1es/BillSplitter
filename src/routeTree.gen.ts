@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AccessDeniedRouteImport } from './routes/access-denied'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiVersionRouteImport } from './routes/api/version'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as ApiUploadthingSplatRouteImport } from './routes/api/uploadthing.$'
@@ -42,6 +43,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVersionRoute = ApiVersionRouteImport.update({
+  id: '/api/version',
+  path: '/api/version',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/version': typeof ApiVersionRoute
   '/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/version': typeof ApiVersionRoute
   '/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/version': typeof ApiVersionRoute
   '/_authenticated/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/uploadthing/$': typeof ApiUploadthingSplatRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/settings'
+    | '/api/version'
     | '/admin/invites'
     | '/api/auth/$'
     | '/api/uploadthing/$'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/settings'
+    | '/api/version'
     | '/admin/invites'
     | '/api/auth/$'
     | '/api/uploadthing/$'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/dashboard'
     | '/_authenticated/settings'
+    | '/api/version'
     | '/_authenticated/admin/invites'
     | '/api/auth/$'
     | '/api/uploadthing/$'
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AccessDeniedRoute: typeof AccessDeniedRoute
   LoginRoute: typeof LoginRoute
+  ApiVersionRoute: typeof ApiVersionRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiUploadthingSplatRoute: typeof ApiUploadthingSplatRoute
 }
@@ -270,6 +283,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/version': {
+      id: '/api/version'
+      path: '/api/version'
+      fullPath: '/api/version'
+      preLoaderRoute: typeof ApiVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/settings': {
@@ -386,6 +406,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AccessDeniedRoute: AccessDeniedRoute,
   LoginRoute: LoginRoute,
+  ApiVersionRoute: ApiVersionRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiUploadthingSplatRoute: ApiUploadthingSplatRoute,
 }
