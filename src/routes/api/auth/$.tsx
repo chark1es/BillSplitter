@@ -51,6 +51,18 @@ const getSetCookieHeaders = (headers: Headers) => {
 const buildDeleteCookieHeader = (name: string, secure: boolean) =>
   `${name}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
 
+/**
+ * Upstream Better Auth on *.convex.site may emit `Domain=<deployment>.convex.site`.
+ * The browser sees the response from the app host (e.g. fairshare.spwnd.dev) and
+ * rejects Set-Cookie when Domain does not match — session cookies never stick, client
+ * stays on /login while OAuth appears to succeed.
+ */
+const rewriteSetCookieForAppOrigin = (setCookie: string) =>
+  setCookie
+    .replace(/;\s*Domain=[^;]*/gi, "")
+    .replace(/;\s*;\s*/g, "; ")
+    .trim();
+
 const forwardAuthRequest = async (request: Request) => {
   const { convexSiteUrl } = getServerEnv();
   const upstreamUrl = new URL(request.url);
@@ -153,7 +165,10 @@ const forwardAuthRequest = async (request: Request) => {
         continue;
       }
 
-      responseHeaders.append("set-cookie", setCookieHeader);
+      responseHeaders.append(
+        "set-cookie",
+        rewriteSetCookieForAppOrigin(setCookieHeader),
+      );
     }
   }
 
