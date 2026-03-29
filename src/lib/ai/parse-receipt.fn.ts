@@ -4,6 +4,10 @@ import type { ParsedReceiptPayload } from "../types";
 import { getServerAuth } from "../auth/server-auth";
 import { getServerEnv, hasConfiguredConvex } from "../env";
 import { convertForeignToUsd, fetchUsdFxSnapshot } from "../fx/usd-fx";
+import {
+  coerceItemQuantity,
+  expandLogicalLinesToParsedItems,
+} from "../receipt/expand-items-by-quantity";
 
 const defaultModel = "google/gemini-3.1-flash-lite-preview";
 
@@ -36,7 +40,8 @@ export const parseReceiptFromUrls = createServerFn({ method: "POST" })
     {
       "foreignName": string (verbatim receipt line item name, non-English ok),
       "translatedName": string (English display name),
-      "foreignPrice": number (numeric line total in detectedCurrencyCode, 2 decimals)
+      "foreignPrice": number (numeric line total in detectedCurrencyCode, 2 decimals),
+      "quantity": number (optional, integer >= 1, default 1; units on this printed line)
     }
   ],
   "taxForeignAmount": number (numeric, detectedCurrencyCode, 2 decimals),
@@ -53,6 +58,8 @@ Rules:
 - Output raw amounts in detectedCurrencyCode only. Do NOT convert amounts to USD in the model output.
 - Use "foreignName" verbatim from the receipt. Use "translatedName" as the English display name.
 - Item prices are line totals before tax/tip unless the receipt only shows one bundled total (then approximate best-effort line items).
+- "foreignPrice" is always the full line total for that printed row (all units on that row), not the unit price.
+- "quantity": use when the receipt shows a quantity column, leading multipliers (e.g. 2 x, 2@), or multiple units on one line; omit or 1 for a single unit.
 - If tax or tip cannot be separated, put 0 in taxForeignAmount/tipForeignAmount and fold into items only if clearly itemized.
 - taxTipMode: prefer "proportional" for restaurant-style splits unless the receipt suggests an even service charge for everyone.`;
 
@@ -109,6 +116,7 @@ Rules:
         foreignName: string;
         translatedName: string;
         foreignPrice: number;
+        quantity?: number;
       }>;
       taxForeignAmount?: number;
       tipForeignAmount?: number;
@@ -122,20 +130,21 @@ Rules:
     ).toUpperCase();
     const fxSnapshot = await fetchUsdFxSnapshot(currencyCode);
 
-    const items = (parsed.items ?? []).map((item, index) => {
+    const logicalLines = (parsed.items ?? []).map((item, index) => {
       const foreignName = String(item.foreignName ?? `Item ${index + 1}`);
       const translatedName = String(
         item.translatedName ?? item.foreignName ?? `Item ${index + 1}`,
       );
-      const foreignPrice = Number(item.foreignPrice ?? 0);
-
+      const foreignLineTotal = Number(Number(item.foreignPrice ?? 0).toFixed(2));
       return {
         foreignName,
         translatedName,
-        foreignPrice: Number(foreignPrice.toFixed(2)),
-        usdPrice: convertForeignToUsd(foreignPrice, fxSnapshot),
+        foreignLineTotal,
+        quantity: coerceItemQuantity(item.quantity),
       };
     });
+
+    const items = expandLogicalLinesToParsedItems(logicalLines, fxSnapshot);
 
     const taxForeignAmount = Number(parsed.taxForeignAmount ?? 0);
     const tipForeignAmount = Number(parsed.tipForeignAmount ?? 0);
