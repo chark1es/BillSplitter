@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
 import type { LocalParsedReceipt } from "../../lib/drafts/local-bill-draft";
@@ -27,15 +28,15 @@ const formatRate = (value: number) =>
     maximumFractionDigits: 6,
   });
 
-const getRateSourceLabel = (rateSource?: LocalParsedReceipt["fxSnapshot"]["rateSource"]) => {
+const getRateSourceLabel = (
+  rateSource?: LocalParsedReceipt["fxSnapshot"]["rateSource"],
+) => {
   if (rateSource === "currencyapi") {
-    return "currencyapi";
+    return "CurrencyAPI";
   }
-
   if (rateSource === "frankfurter") {
     return "Frankfurter";
   }
-
   return "USD parity";
 };
 
@@ -57,6 +58,9 @@ export function ExchangeRateCard({
     () => calculateParsedReceiptGrandTotalUsd(parsedReceipt),
     [parsedReceipt],
   );
+
+  const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
+  const inverseUsdPerForeign = 1 / rate;
 
   useEffect(() => {
     if (!isForeignReceipt) {
@@ -127,85 +131,81 @@ export function ExchangeRateCard({
     }
   };
 
+  const dateShort =
+    parsedReceipt.fxSnapshot.lastUpdatedAt ?? parsedReceipt.fxSnapshot.date;
+
   return (
-    <div className="mt-6 rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface-2)] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="eyebrow">Live FX calculator</p>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            Detected foreign currency: {parsedReceipt.currencyCode}. Refresh to pull
-            the latest rate and recalculate the USD values for this receipt.
-          </p>
+    <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 sm:px-4 sm:py-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1">
+        <div className="min-w-0 flex-1 font-mono text-[0.8125rem] leading-snug text-[var(--ink)] sm:text-sm">
+          <span className="tabular-nums">
+            1 USD = {formatRate(rate)} {parsedReceipt.currencyCode}
+          </span>
+          <span className="mx-1.5 text-[var(--muted)]">·</span>
+          <span className="tabular-nums">
+            1 {parsedReceipt.currencyCode} = {formatRate(inverseUsdPerForeign)} USD
+          </span>
         </div>
         <Button
-          className="rounded-full border-[var(--line)] bg-white/70 text-[var(--ink)] hover:bg-white"
+          aria-label="Refresh exchange rate"
+          className="shrink-0 rounded-full border-[var(--line)] bg-white/80 text-[var(--ink)] hover:bg-white"
           disabled={isRefreshing}
           onClick={() => void handleRefreshRate()}
+          size="icon-sm"
           variant="outline"
         >
-          {isRefreshing ? "Refreshing…" : "Refresh rate"}
+          <RefreshCw
+            aria-hidden
+            className={isRefreshing ? "animate-spin" : ""}
+            strokeWidth={2}
+          />
         </Button>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm">
-          <p className="font-semibold text-[var(--ink)]">
-            1 USD = {formatRate(parsedReceipt.fxSnapshot.foreignUnitsPerUsd)}{" "}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 sm:gap-3">
+        <label className="grid gap-1">
+          <span className="text-[0.65rem] font-medium uppercase tracking-wide text-[var(--muted)]">
             {parsedReceipt.currencyCode}
-          </p>
-          <p className="mt-2 text-[var(--muted)]">
-            1 {parsedReceipt.currencyCode} ={" "}
-            {formatRate(1 / parsedReceipt.fxSnapshot.foreignUnitsPerUsd)} USD
-          </p>
-          <p className="mt-3 text-xs text-[var(--muted)]">
-            Source: {getRateSourceLabel(parsedReceipt.fxSnapshot.rateSource)}
-          </p>
-          <p className="text-xs text-[var(--muted)]">
-            Updated:{" "}
-            {parsedReceipt.fxSnapshot.lastUpdatedAt ?? parsedReceipt.fxSnapshot.date}
-          </p>
-        </div>
+          </span>
+          <Input
+            className="h-9 rounded-xl border-[var(--line)] bg-white/80 px-3 text-sm text-[var(--ink)]"
+            inputMode="decimal"
+            onChange={(event) => handleForeignAmountChange(event.target.value)}
+            placeholder={`0.00`}
+            type="text"
+            value={foreignAmount}
+          />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-[0.65rem] font-medium uppercase tracking-wide text-[var(--muted)]">
+            USD
+          </span>
+          <Input
+            className="h-9 rounded-xl border-[var(--line)] bg-white/80 px-3 text-sm text-[var(--ink)]"
+            inputMode="decimal"
+            onChange={(event) => handleUsdAmountChange(event.target.value)}
+            placeholder="0.00"
+            type="text"
+            value={usdAmount}
+          />
+        </label>
+      </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs">
-            <span className="text-[var(--muted)]">
-              Amount ({parsedReceipt.currencyCode})
-            </span>
-            <Input
-              className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-              inputMode="decimal"
-              onChange={(event) => handleForeignAmountChange(event.target.value)}
-              placeholder={`0.00 ${parsedReceipt.currencyCode}`}
-              type="text"
-              value={foreignAmount}
-            />
-          </label>
-
-          <label className="grid gap-1 text-xs">
-            <span className="text-[var(--muted)]">Amount (USD)</span>
-            <Input
-              className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-              inputMode="decimal"
-              onChange={(event) => handleUsdAmountChange(event.target.value)}
-              placeholder="0.00 USD"
-              type="text"
-              value={usdAmount}
-            />
-          </label>
-
-          <Button
-            className="rounded-full border-[var(--line)] bg-white/70 text-[var(--ink)] hover:bg-white sm:col-span-2"
-            onClick={() => handleForeignAmountChange(formatMoneyInput(receiptTotalForeign))}
-            type="button"
-            variant="outline"
-          >
-            Use receipt total
-          </Button>
-        </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <button
+          className="text-xs font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
+          onClick={() => handleForeignAmountChange(formatMoneyInput(receiptTotalForeign))}
+          type="button"
+        >
+          Use receipt total
+        </button>
+        <p className="text-[0.65rem] text-[var(--muted)]">
+          {getRateSourceLabel(parsedReceipt.fxSnapshot.rateSource)} · {dateShort}
+        </p>
       </div>
 
       {refreshError ? (
-        <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
           {refreshError}
         </p>
       ) : null}

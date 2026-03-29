@@ -190,7 +190,7 @@ export function ReviewStep() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
       <BillWizardNavBar
         currentPath="/bills/new/review"
         onBack={() => navigate({ to: "/bills/new/assign", viewTransition: true })}
@@ -200,6 +200,7 @@ export function ReviewStep() {
 
       <BillSummaryScreen
         bill={previewBill}
+        wizardStep={5}
         contentTop={
           <>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -277,8 +278,8 @@ export function ReviewStep() {
         eyebrow={draft.linkedBillId ? "Saved summary" : "Step 5"}
         headerExtras={<LocalDraftDisclosure />}
         sidePanel={
-          <aside className="panel p-6">
-            <p className="eyebrow mb-3">
+          <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
+            <p className="eyebrow mb-2 text-[0.65rem]">
               {draft.linkedBillId ? "Saved bill" : "Save split"}
             </p>
             <p className="text-sm leading-6 text-[var(--muted)]">

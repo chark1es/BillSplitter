@@ -1,5 +1,14 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { ClipboardPaste, ImagePlus, MousePointer2, Upload } from "lucide-react";
 import { parseReceiptFromUrls } from "../../lib/ai/parse-receipt.fn";
 import { convertReceiptFileToWebp } from "../../lib/receipt/image-to-webp";
 import {
@@ -11,9 +20,11 @@ import {
 import { useUploadThing } from "../../lib/uploadthing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
+import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
+import { cn } from "../../lib/utils";
 
 type PreviewRow = {
   id: string;
@@ -36,8 +47,13 @@ export function UploadStep() {
 
   const [uploadRows, setUploadRows] = useState<PreviewRow[]>([]);
   const [uploadMode, setUploadMode] = useState<"add" | "replace">("add");
+  const [isDragging, setIsDragging] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
+  const dragDepthRef = useRef(0);
+  const suppressNextZoneClickRef = useRef(false);
+  const uploadModeRef = useRef(uploadMode);
+  uploadModeRef.current = uploadMode;
 
   const { startUpload, isUploading } = useUploadThing("receiptImage");
 
@@ -101,10 +117,8 @@ export function UploadStep() {
     });
   };
 
-  const replaceOrAddPagesWithFiles = async (
-    fileList: FileList | null,
-    mode: "add" | "replace",
-  ) => {
+  const replaceOrAddPagesWithFiles = useCallback(
+    async (fileList: FileList | File[] | null, mode: "add" | "replace") => {
     const files = Array.from(fileList ?? []);
     if (files.length === 0) {
       return;
@@ -213,7 +227,39 @@ export function UploadStep() {
         );
       }
     }
-  };
+    },
+    [patchDraft, startUpload],
+  );
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) {
+        return;
+      }
+      const items = e.clipboardData?.items;
+      if (!items?.length) {
+        return;
+      }
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+          const f = item.getAsFile();
+          if (f) {
+            files.push(f);
+          }
+        }
+      }
+      if (files.length === 0) {
+        return;
+      }
+      e.preventDefault();
+      void replaceOrAddPagesWithFiles(files, uploadModeRef.current);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [replaceOrAddPagesWithFiles]);
 
   const removeReceiptPage = (id: string) => {
     setParseError(null);
@@ -285,30 +331,114 @@ export function UploadStep() {
     }
   };
 
+  const openFilePicker = () => {
+    document.getElementById(inputId)?.click();
+  };
+
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    suppressNextZoneClickRef.current = true;
+    requestAnimationFrame(() => {
+      suppressNextZoneClickRef.current = false;
+    });
+    void replaceOrAddPagesWithFiles(e.dataTransfer.files, uploadMode);
+  };
+
+  const handleUploadZoneClick = () => {
+    if (suppressNextZoneClickRef.current) {
+      return;
+    }
+    openFilePicker();
+  };
+
+  const pageCount = draft?.receipt.pages.length ?? 0;
+  const isUploadActive = isUploading || uploadRows.length > 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
       <BillWizardNavBar
         currentPath="/bills/new/upload"
         onBack={() => navigate({ to: "/dashboard", viewTransition: true })}
         step={1}
         totalSteps={5}
       />
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 1</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
-          Upload the receipt.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Images are converted to lightweight WebP, stored securely, then parsed
-          into line items. You can preview or remove each file before continuing.
-        </p>
-        <div className="mt-4">
-          <LocalDraftDisclosure />
-        </div>
-      </section>
+      <BillWizardHero
+        description="Drop, paste, or browse. Images are compressed to WebP before upload; tap parse when your pages are ready."
+        eyebrow="Receipt"
+        step={1}
+        title="Upload the receipt."
+        trailing={<LocalDraftDisclosure />}
+      />
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <article className="panel min-w-0 p-6 sm:p-8">
+      <section className="grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start lg:gap-6">
+        <article className="panel min-w-0 p-5 sm:p-7">
+          <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-lg text-[var(--ink)]">Receipt pages</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {pageCount === 0
+                  ? "No pages yet — add one or more images or a PDF."
+                  : `${pageCount} page${pageCount === 1 ? "" : "s"} ready`}
+              </p>
+            </div>
+            <div
+              className="inline-flex rounded-full border border-[var(--line)] bg-[var(--surface-2)] p-1"
+              role="group"
+              aria-label="Whether new files add pages or replace all"
+            >
+              <button
+                className={cn(
+                  "rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors",
+                  uploadMode === "add"
+                    ? "bg-white text-[var(--ink)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--ink)]",
+                )}
+                onClick={() => setUploadMode("add")}
+                type="button"
+              >
+                Add
+              </button>
+              <button
+                className={cn(
+                  "rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide transition-colors",
+                  uploadMode === "replace"
+                    ? "bg-white text-[var(--ink)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--ink)]",
+                )}
+                onClick={() => setUploadMode("replace")}
+                type="button"
+              >
+                Replace all
+              </button>
+            </div>
+          </div>
+
           <input
             accept="image/*,application/pdf,.heic,.heif"
             className="sr-only"
@@ -321,65 +451,103 @@ export function UploadStep() {
             type="file"
           />
 
-          <button
-            className="upload-zone w-full"
-            onClick={() => {
-              setUploadMode("add");
-              document.getElementById(inputId)?.click();
+          <div
+            aria-label="Upload receipt files"
+            className={cn(
+              "upload-zone w-full border-2 border-dashed border-[var(--line)] bg-[var(--surface-2)]/80",
+              isDragging && "upload-zone--drag",
+              isUploadActive && "upload-zone--compact",
+            )}
+            onClick={handleUploadZoneClick}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openFilePicker();
+              }
             }}
-            type="button"
+            role="button"
+            tabIndex={0}
           >
-            <span className="eyebrow">Add receipt pages</span>
-            <span className="display mt-3 block text-3xl text-[var(--ink)]">
-              PDF, HEIC, PNG, JPEG…
-            </span>
-            <span className="mt-2 block text-sm text-[var(--muted)]">
-              Each file is converted to WebP (&lt;100KB) before upload.
-            </span>
-          </button>
-
-          <button
-            className="secondary-button mt-3 w-full justify-center"
-            onClick={() => {
-              setUploadMode("replace");
-              document.getElementById(inputId)?.click();
-            }}
-            type="button"
-          >
-            Replace all pages
-          </button>
+            <div
+              className={cn(
+                "flex flex-col items-start gap-4",
+                !isUploadActive && "sm:flex-row sm:items-center sm:gap-5",
+              )}
+            >
+              {!isUploadActive ? (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[var(--line)] bg-white/80 text-[var(--accent)] shadow-sm">
+                  <ImagePlus aria-hidden className="size-7" strokeWidth={1.75} />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1 text-left">
+                <span className="eyebrow">
+                  {uploadMode === "replace" ? "Replace with new files" : "Add receipt pages"}
+                </span>
+                <span className="display mt-2 block text-2xl text-[var(--ink)] sm:text-3xl">
+                  {isDragging ? "Drop to upload" : "PDF, HEIC, PNG, JPEG…"}
+                </span>
+                <ul className="mt-3 flex flex-col gap-2 text-sm text-[var(--muted)] sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1">
+                  <li className="flex items-center gap-2">
+                    <Upload aria-hidden className="size-4 shrink-0 opacity-70" />
+                    Drag and drop files
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <ClipboardPaste aria-hidden className="size-4 shrink-0 opacity-70" />
+                    Paste image from clipboard
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <MousePointer2 aria-hidden className="size-4 shrink-0 opacity-70" />
+                    Click to browse
+                  </li>
+                </ul>
+                <p className="mt-3 text-xs leading-relaxed text-[var(--muted)]/90">
+                  Each file is converted to WebP (&lt;100KB) before upload.{" "}
+                  <span className="font-medium text-[var(--muted)]">
+                    {uploadMode === "replace"
+                      ? "Existing pages are cleared when upload starts."
+                      : "New pages append to the list."}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
 
           {draft?.receipt.pages.length ? (
-            <div className="mt-8 grid gap-4">
+            <div className="mt-4 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)] bg-white/45">
               {draft.receipt.pages.map((page) => (
-                <div className="receipt-row flex-wrap gap-4" key={page.id}>
-                  <div className="flex min-w-0 flex-1 items-start gap-4">
-                    <button
-                      className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]"
-                      onClick={() => window.open(page.ufsUrl, "_blank")}
-                      type="button"
-                    >
-                      <img
-                        alt=""
-                        className="h-full w-full object-cover"
-                        src={page.ufsUrl}
-                      />
-                    </button>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[var(--ink)]">{page.label}</p>
-                      <p className="text-sm text-[var(--muted)]">Ready</p>
-                    </div>
+                <div
+                  className="flex items-center gap-2.5 px-2.5 py-2 sm:gap-3 sm:px-3"
+                  key={page.id}
+                >
+                  <button
+                    className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-2)] sm:h-12 sm:w-12"
+                    onClick={() => window.open(page.ufsUrl, "_blank")}
+                    type="button"
+                  >
+                    <img
+                      alt=""
+                      className="h-full w-full object-cover"
+                      src={page.ufsUrl}
+                    />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{page.label}</p>
+                    <p className="text-[0.65rem] text-[var(--muted)]">Ready</p>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                     <button
-                      className="secondary-button"
+                      className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-soft)]"
                       onClick={() => window.open(page.ufsUrl, "_blank")}
                       type="button"
                     >
                       View
                     </button>
                     <button
-                      className="secondary-button"
+                      className="rounded-lg px-2 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-rose-50 hover:text-rose-800"
                       onClick={() => removeReceiptPage(page.id)}
                       type="button"
                     >
@@ -392,39 +560,40 @@ export function UploadStep() {
           ) : null}
 
           {uploadRows.length ? (
-            <div className="mt-6 grid gap-4">
+            <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)] border-dashed bg-[var(--surface-2)]/60">
               {uploadRows.map((row) => (
-                <div className="receipt-row flex-wrap gap-4" key={row.id}>
-                  <div className="flex min-w-0 flex-1 items-start gap-4">
-                    {row.previewUrl ? (
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]">
-                        <img
-                          alt=""
-                          className="h-full w-full object-cover"
-                          src={row.previewUrl}
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-dashed border-[var(--line)] text-xs text-[var(--muted)]">
-                        …
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[var(--ink)]">{row.label}</p>
-                      <p className="text-sm text-[var(--muted)]">
-                        {row.status === "converting"
-                          ? "Optimizing…"
-                          : row.status === "uploading"
-                            ? "Uploading…"
-                            : row.status === "ready"
-                              ? "Ready"
-                              : row.error ?? "Error"}
-                      </p>
+                <div
+                  className="flex items-center gap-2.5 px-2.5 py-2 sm:gap-3 sm:px-3"
+                  key={row.id}
+                >
+                  {row.previewUrl ? (
+                    <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--surface-2)] sm:h-12 sm:w-12">
+                      <img
+                        alt=""
+                        className="h-full w-full object-cover"
+                        src={row.previewUrl}
+                      />
                     </div>
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--line)] text-[0.65rem] text-[var(--muted)] sm:h-12 sm:w-12">
+                      …
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{row.label}</p>
+                    <p className="text-[0.65rem] text-[var(--muted)]">
+                      {row.status === "converting"
+                        ? "Optimizing…"
+                        : row.status === "uploading"
+                          ? "Uploading…"
+                          : row.status === "ready"
+                            ? "Ready"
+                            : row.error ?? "Error"}
+                    </p>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 items-center gap-0.5">
                     <button
-                      className="secondary-button"
+                      className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-40"
                       disabled={!row.ufsUrl && row.status !== "error"}
                       onClick={() =>
                         window.open(row.ufsUrl ?? row.previewUrl, "_blank")
@@ -434,7 +603,7 @@ export function UploadStep() {
                       View
                     </button>
                     <button
-                      className="secondary-button"
+                      className="rounded-lg px-2 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-rose-50 hover:text-rose-800"
                       onClick={() => removeUploadRow(row.id)}
                       type="button"
                     >
@@ -453,17 +622,16 @@ export function UploadStep() {
           ) : null}
 
           {parsedReceipt ? (
-            <div className="mt-8 border-t border-[var(--line)] pt-8">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="eyebrow mb-2">Receipt parsed</p>
-                  <p className="text-sm text-[var(--muted)]">
-                    Continue to the next step to review line items in a table and edit
-                    them in a mobile-friendly modal.
+                  <p className="eyebrow text-[0.65rem]">Parsed</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">
+                    Totals from the receipt — refine line items on the next step.
                   </p>
                 </div>
                 <button
-                  className="secondary-button text-xs"
+                  className="secondary-button shrink-0 self-start text-xs sm:self-auto"
                   disabled={!canParse || isParsing}
                   onClick={() => void handleParse()}
                   type="button"
@@ -472,94 +640,99 @@ export function UploadStep() {
                 </button>
               </div>
 
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <div className="rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface-2)] p-5">
-                  <p className="eyebrow">Before ({parsedReceipt.currencyCode})</p>
-                  <dl className="mt-4 space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Subtotal</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
+              <ExchangeRateCard
+                onParsedReceiptChange={updateParsedReceipt}
+                parsedReceipt={parsedReceipt}
+              />
+
+              <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 sm:px-4">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Receipt math
+                </p>
+                <div className="mt-2 grid gap-3 text-xs sm:grid-cols-2 sm:gap-6">
+                  <dl className="space-y-1">
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">Sub</dt>
+                      <dd className="font-medium text-[var(--ink)]">
                         {computedSubtotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tax</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {parsedReceipt.taxForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">+Tax</dt>
+                      <dd>{parsedReceipt.taxForeignAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tip</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {parsedReceipt.tipForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">+Tip</dt>
+                      <dd>{parsedReceipt.tipForeignAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Discount</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        -{discountForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">−Disc</dt>
+                      <dd>{discountForeignAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
-                      <dt className="font-semibold text-[var(--ink)]">Total</dt>
-                      <dd className="tabular-nums font-bold text-[var(--ink)]">
+                    <div className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 tabular-nums">
+                      <dt className="font-semibold text-[var(--ink)]">Σ</dt>
+                      <dd className="font-bold text-[var(--ink)]">
                         {adjustedGrandTotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
                       </dd>
                     </div>
                   </dl>
-                </div>
-
-                <div className="rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface-2)] p-5">
-                  <p className="eyebrow">After (USD)</p>
-                  <dl className="mt-4 space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Subtotal</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
+                  <dl className="space-y-1">
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">Sub</dt>
+                      <dd className="font-medium text-[var(--ink)]">
                         {computedSubtotalUsd.toFixed(2)} USD
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tax</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {parsedReceipt.taxUsdAmount.toFixed(2)} USD
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">+Tax</dt>
+                      <dd>{parsedReceipt.taxUsdAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tip</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {parsedReceipt.tipUsdAmount.toFixed(2)} USD
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">+Tip</dt>
+                      <dd>{parsedReceipt.tipUsdAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Discount</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        -{discountUsdAmount.toFixed(2)} USD
-                      </dd>
+                    <div className="flex justify-between gap-3 tabular-nums">
+                      <dt className="text-[var(--muted)]">−Disc</dt>
+                      <dd>{discountUsdAmount.toFixed(2)}</dd>
                     </div>
-                    <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
-                      <dt className="font-semibold text-[var(--ink)]">Total</dt>
-                      <dd className="tabular-nums font-bold text-[var(--ink)]">
+                    <div className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 tabular-nums">
+                      <dt className="font-semibold text-[var(--ink)]">Σ</dt>
+                      <dd className="font-bold text-[var(--ink)]">
                         {adjustedGrandTotalUsd.toFixed(2)} USD
                       </dd>
                     </div>
                   </dl>
                 </div>
+                <p className="mt-2 text-[0.65rem] leading-snug text-[var(--muted)]">
+                  USD amounts use the snapshot rate above; changing FX updates item USD
+                  values elsewhere in the flow.
+                </p>
               </div>
-
-              <ExchangeRateCard
-                onParsedReceiptChange={updateParsedReceipt}
-                parsedReceipt={parsedReceipt}
-              />
             </div>
           ) : null}
         </article>
 
-        <aside className="panel p-6">
-          <p className="eyebrow mb-3">Next</p>
-          <ol className="space-y-3 text-sm leading-6 text-[var(--muted)]">
-            <li>1. Optimize and upload images.</li>
-            <li>2. Review itemized receipt in table view.</li>
-            <li>3. Add who split the bill.</li>
+        <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
+          <p className="eyebrow mb-3 text-[0.65rem]">What&apos;s next</p>
+          <ol className="space-y-3.5 text-sm leading-relaxed text-[var(--muted)]">
+            <li className="flex gap-3">
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--accent)]">
+                1
+              </span>
+              <span>Optimize and upload your receipt pages.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--accent)]">
+                2
+              </span>
+              <span>Review and edit line items in the table.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--accent)]">
+                3
+              </span>
+              <span>Add everyone who split the bill.</span>
+            </li>
           </ol>
           {!parsedReceipt ? (
             <button

@@ -5,14 +5,22 @@ import {
   buildBillSummary,
   buildCompactItemList,
   hydrateBillWithAssignments,
+  type BillSummaryRow,
 } from "../../lib/bill-calculations";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
-import type { AssignmentMap } from "../../lib/types";
+import type { AssignmentMap, BillDetail } from "../../lib/types";
+import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "#/components/ui/dialog";
 
 export function AssignStep() {
   const navigate = useNavigate();
@@ -20,6 +28,9 @@ export function AssignStep() {
   useBillWizardRoutePreload("/bills/new/assign");
 
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [splitDetailForParticipantId, setSplitDetailForParticipantId] = useState<
+    string | null
+  >(null);
   const [assignmentMap, setAssignmentMap] = useState<AssignmentMap>(
     {},
   );
@@ -139,12 +150,16 @@ export function AssignStep() {
     }));
   };
 
-  if (!bill || !summary) {
+  if (!bill || !summary || !workingBill) {
     return null;
   }
 
+  const splitDetailRow = splitDetailForParticipantId
+    ? summary.summaries.find((r) => r.participant.id === splitDetailForParticipantId)
+    : null;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
       <BillWizardNavBar
         currentPath="/bills/new/assign"
         onBack={() =>
@@ -153,22 +168,16 @@ export function AssignStep() {
         step={4}
         totalSteps={5}
       />
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 4</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
-          Assign every item.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Tap an item to choose who shared it. When collapsed, you’ll see who’s
-          on each line.
-        </p>
-        <div className="mt-4">
-          <LocalDraftDisclosure />
-        </div>
-      </section>
+      <BillWizardHero
+        description="Expand a line to toggle people. Collapsed rows show who’s on each item at a glance."
+        eyebrow="Assign"
+        step={4}
+        title="Assign every item."
+        trailing={<LocalDraftDisclosure />}
+      />
 
-      <section className="grid gap-5 xl:grid-cols-[1fr_18rem]">
-        <article className="panel p-4 sm:p-5">
+      <section className="grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start lg:gap-6 xl:grid-cols-[1fr_19rem]">
+        <article className="panel p-4 sm:p-5 md:p-6">
           <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--line)] bg-white/55 px-3 py-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
@@ -301,7 +310,7 @@ export function AssignStep() {
           </div>
         </article>
 
-        <aside className="panel space-y-4 p-4 sm:p-5 xl:sticky xl:top-6">
+        <aside className="panel space-y-3 p-4 sm:space-y-4 sm:p-5 lg:sticky lg:top-5 xl:p-6">
           <div>
             <div className="mb-2 flex items-end justify-between gap-3">
               <p className="eyebrow text-[0.62rem] leading-none">Live split</p>
@@ -311,7 +320,8 @@ export function AssignStep() {
               </span>
             </div>
             <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-gradient-to-b from-white/80 to-[var(--surface-2)]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
-              {summary.summaries.map(({ participant, total, items }, idx) => {
+              {summary.summaries.map((row, idx) => {
+                const { participant, total, items } = row;
                 const { visibleNames, hiddenCount } = buildCompactItemList(items, 2);
                 const itemLabel =
                   items.length === 0
@@ -320,9 +330,12 @@ export function AssignStep() {
                       ? `${visibleNames.join(", ")} · +${hiddenCount} more`
                       : visibleNames.join(", ");
                 return (
-                  <div
-                    className={`flex gap-2 px-2.5 py-1.5 sm:gap-2.5 sm:px-3 sm:py-2 ${idx > 0 ? "border-t border-[var(--line)]/70" : ""}`}
+                  <button
+                    aria-label={`View full split for ${participant.name}`}
+                    className={`flex w-full gap-2 px-2.5 py-1.5 text-left transition hover:bg-white/50 sm:gap-2.5 sm:px-3 sm:py-2 ${idx > 0 ? "border-t border-[var(--line)]/70" : ""}`}
                     key={participant.id}
+                    onClick={() => setSplitDetailForParticipantId(participant.id)}
+                    type="button"
                   >
                     <span
                       className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.55rem] font-extrabold leading-none text-white ring-1 ring-black/[0.06]"
@@ -346,7 +359,7 @@ export function AssignStep() {
                         {itemLabel}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -383,6 +396,151 @@ export function AssignStep() {
           </button>
         </aside>
       </section>
+
+      <Dialog
+        onOpenChange={(open) => !open && setSplitDetailForParticipantId(null)}
+        open={splitDetailForParticipantId != null}
+      >
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded-[1.25rem] border border-[var(--line)] bg-[var(--surface)] p-0 sm:rounded-2xl">
+          {splitDetailRow ? (
+            <SplitDetailModalBody
+              bill={workingBill}
+              onClose={() => setSplitDetailForParticipantId(null)}
+              row={splitDetailRow}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function apportionTaxAndTip(
+  taxTipShare: number,
+  taxAmount: number,
+  tipAmount: number,
+) {
+  const pool = taxAmount + tipAmount;
+  if (pool <= 0) {
+    return { taxShare: 0, tipShare: 0 };
+  }
+  return {
+    taxShare: taxTipShare * (taxAmount / pool),
+    tipShare: taxTipShare * (tipAmount / pool),
+  };
+}
+
+function SplitDetailModalBody({
+  row,
+  bill,
+  onClose,
+}: {
+  row: BillSummaryRow;
+  bill: BillDetail;
+  onClose: () => void;
+}) {
+  const { participant, items, itemSubtotal, taxTipShare, total } = row;
+  const { taxShare, tipShare } = apportionTaxAndTip(
+    taxTipShare,
+    bill.taxAmount,
+    bill.tipAmount,
+  );
+
+  const tipModeLabel =
+    bill.taxTipMode === "equal"
+      ? "Tax and tip are split evenly across everyone."
+      : "Tax and tip are allocated in proportion to each person’s assigned items.";
+
+  return (
+    <>
+      <DialogHeader className="border-b border-[var(--line)] px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+        <div className="flex items-start gap-3">
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white shadow-sm"
+            style={{ backgroundColor: participant.color }}
+          >
+            {participant.initials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="display text-left text-xl text-[var(--ink)] sm:text-2xl">
+              {participant.name}
+            </DialogTitle>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <ParticipantPaidBadge isSelf={participant.isSelf} />
+              <span className="text-xs text-[var(--muted)]">{tipModeLabel}</span>
+            </div>
+          </div>
+          <p className="shrink-0 text-right">
+            <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Owes
+            </span>
+            <span className="display block text-2xl leading-none text-[var(--ink)]">
+              ${total.toFixed(2)}
+            </span>
+          </p>
+        </div>
+      </DialogHeader>
+
+      <div className="px-5 py-4 sm:px-6">
+        {items.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-2)] px-4 py-6 text-center text-sm text-[var(--muted)]">
+            No line items assigned to this person yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[var(--line)] rounded-xl border border-[var(--line)] bg-white/60">
+            {items.map(({ item, share }) => (
+              <li
+                className="flex items-center justify-between gap-3 px-3 py-2.5 first:rounded-t-xl last:rounded-b-xl"
+                key={item.id}
+              >
+                <span className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">
+                  {item.name}
+                </span>
+                <span className="shrink-0 tabular-nums text-sm font-semibold text-[var(--ink)]">
+                  ${share.toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <dl className="mt-4 space-y-2 border-t border-[var(--line)] pt-4 text-sm">
+          <div className="flex justify-between gap-4 tabular-nums">
+            <dt className="text-[var(--muted)]">Items subtotal</dt>
+            <dd className="font-medium text-[var(--ink)]">${itemSubtotal.toFixed(2)}</dd>
+          </div>
+          {bill.taxAmount > 0 ? (
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-[var(--muted)]">Your share of tax</dt>
+              <dd className="text-[var(--ink)]">${taxShare.toFixed(2)}</dd>
+            </div>
+          ) : null}
+          {bill.tipAmount > 0 ? (
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-[var(--muted)]">Your share of tip</dt>
+              <dd className="text-[var(--ink)]">${tipShare.toFixed(2)}</dd>
+            </div>
+          ) : null}
+          {bill.taxAmount <= 0 && bill.tipAmount <= 0 && taxTipShare > 0 ? (
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-[var(--muted)]">Tax &amp; tip</dt>
+              <dd className="text-[var(--ink)]">${taxTipShare.toFixed(2)}</dd>
+            </div>
+          ) : null}
+          <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2 tabular-nums">
+            <dt className="font-semibold text-[var(--ink)]">Total</dt>
+            <dd className="font-bold text-[var(--ink)]">${total.toFixed(2)}</dd>
+          </div>
+        </dl>
+
+        <button
+          className="primary-button mt-5 w-full justify-center py-2.5 text-sm"
+          onClick={onClose}
+          type="button"
+        >
+          Done
+        </button>
+      </div>
+    </>
   );
 }

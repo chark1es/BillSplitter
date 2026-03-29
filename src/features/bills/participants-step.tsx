@@ -13,6 +13,7 @@ import { cn } from "#/lib/utils";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import type { ParticipantDraft } from "../../lib/types";
+import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
@@ -185,7 +186,7 @@ export function ParticipantsStep() {
   const canContinue = rows.length >= 2;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
       <BillWizardNavBar
         currentPath="/bills/new/participants"
         onBack={() =>
@@ -194,31 +195,17 @@ export function ParticipantsStep() {
         step={3}
         totalSteps={5}
       />
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <div className="flex gap-6 sm:gap-8">
-          <div
-            aria-hidden
-            className="hidden w-1 shrink-0 rounded-full bg-gradient-to-b from-[var(--accent)] to-[var(--accent-soft)] sm:block"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="eyebrow mb-3">Step 3 · People</p>
-            <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl lg:text-6xl">
-              Who split the table?
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-[var(--muted)]">
-              Name everyone who shared the bill. Colors are assigned automatically so you can tell
-              line items apart on the next step. Mark who paid so totals stay clear.
-            </p>
-            <div className="mt-5">
-              <LocalDraftDisclosure />
-            </div>
-          </div>
-        </div>
-      </section>
+      <BillWizardHero
+        description="Everyone who shared the bill gets a color for the assign step. Mark who paid so balances read clearly."
+        eyebrow="People"
+        step={3}
+        title="Who split the table?"
+        trailing={<LocalDraftDisclosure />}
+      />
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_17rem] lg:items-start">
+      <section className="grid gap-5 lg:grid-cols-[1fr_17rem] lg:items-start lg:gap-6">
         <article className="panel min-w-0 overflow-hidden p-0">
-          <div className="border-b border-[var(--line)] bg-[var(--surface-2)]/90 px-6 py-5 sm:px-8 sm:py-6">
+          <div className="border-b border-[var(--line)] bg-[var(--surface-2)]/90 px-5 py-5 sm:px-7 sm:py-6">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex size-9 items-center justify-center rounded-2xl bg-white/80 text-[var(--accent)] shadow-sm ring-1 ring-[var(--line)]">
                 <UserPlusIcon aria-hidden className="size-[1.15rem]" strokeWidth={2.25} />
@@ -274,7 +261,7 @@ export function ParticipantsStep() {
             </button>
           </div>
 
-          <div className="px-6 py-6 sm:px-8 sm:py-8">
+          <div className="px-5 py-5 sm:px-7 sm:py-7">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <span className="inline-flex size-9 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
@@ -356,8 +343,8 @@ export function ParticipantsStep() {
           </div>
         </article>
 
-        <aside className="panel flex flex-col p-6 sm:p-7 lg:sticky lg:top-6">
-          <p className="eyebrow mb-2">Next step</p>
+        <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
+          <p className="eyebrow mb-2 text-[0.65rem]">Next step</p>
           <p className="display text-4xl leading-none text-[var(--ink)]">{rows.length}</p>
           <p className="mt-1.5 text-sm font-medium text-[var(--muted)]">people at the table</p>
 

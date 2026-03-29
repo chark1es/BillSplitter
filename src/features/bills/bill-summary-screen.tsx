@@ -10,6 +10,8 @@ type BillSummaryScreenProps = {
   eyebrow: string;
   title: string;
   description: string;
+  /** When set, hero matches bill wizard steps (badge + layout). */
+  wizardStep?: number;
   headerExtras?: ReactNode;
   contentTop?: ReactNode;
   sidePanel: ReactNode;
@@ -70,6 +72,7 @@ export function BillSummaryScreen({
   eyebrow,
   title,
   description,
+  wizardStep,
   headerExtras,
   contentTop,
   sidePanel,
@@ -173,7 +176,7 @@ export function BillSummaryScreen({
       : false;
 
   return (
-    <div className="space-y-6">
+    <div className={wizardStep != null ? "space-y-5 sm:space-y-6" : "space-y-6"}>
       <div
         aria-hidden
         className="pointer-events-none fixed left-[-10000px] top-0 z-[-1]"
@@ -184,16 +187,54 @@ export function BillSummaryScreen({
         </div>
       </div>
 
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">{eyebrow}</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">{title}</h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          {description}
-        </p>
-        {headerExtras ? <div className="mt-4">{headerExtras}</div> : null}
+      <section
+        className={
+          wizardStep != null
+            ? "hero-panel relative overflow-hidden px-5 py-7 sm:px-9 sm:py-9"
+            : "hero-panel px-7 py-8 sm:px-10 sm:py-10"
+        }
+      >
+        {wizardStep != null ? (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[var(--accent-soft)] blur-3xl sm:h-64 sm:w-64"
+          />
+        ) : null}
+        {wizardStep != null ? (
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+            <div className="min-w-0 flex-1">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-full border border-[var(--line)] bg-white/70 px-2 text-xs font-bold tabular-nums text-[var(--accent)] shadow-sm">
+                  {wizardStep}
+                </span>
+                <span className="eyebrow">{eyebrow}</span>
+              </div>
+              <h1 className="display text-3xl leading-[1.05] text-[var(--ink)] sm:text-4xl lg:text-[2.75rem]">
+                {title}
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
+                {description}
+              </p>
+            </div>
+            {headerExtras ? (
+              <div className="w-full shrink-0 lg:max-w-[min(100%,20rem)] lg:text-right">
+                {headerExtras}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <p className="eyebrow mb-3">{eyebrow}</p>
+            <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">{title}</h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
+              {description}
+            </p>
+            {headerExtras ? <div className="mt-4">{headerExtras}</div> : null}
+          </>
+        )}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <article className="panel min-w-0 p-5 sm:p-6">
           <div className="bill-total-card !p-4 sm:!p-5">
             <p className="eyebrow">Receipt total</p>
@@ -342,6 +383,7 @@ export function BillSummaryScreen({
         <div className="space-y-6">
           {sidePanel}
           <ReceiptPreviewRail
+            compact
             imageNames={bill.imageNames}
             receiptImageUrls={bill.receiptImageUrls}
             title={bill.title}

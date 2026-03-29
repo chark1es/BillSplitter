@@ -278,10 +278,39 @@ a {
   justify-content: center;
   padding: 2rem;
   text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .upload-zone:hover {
   background: rgba(255, 255, 255, 0.8);
+}
+
+.upload-zone--drag {
+  border-color: rgba(156, 78, 31, 0.42) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    var(--shadow);
+}
+
+.upload-zone:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.upload-zone--compact {
+  min-height: 12rem;
+  padding-block: 1.35rem;
+}
+
+@media (min-width: 640px) {
+  .upload-zone--compact {
+    min-height: 13rem;
+  }
 }
 
 .mini-chip {

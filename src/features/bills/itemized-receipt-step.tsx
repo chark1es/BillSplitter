@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
@@ -289,76 +290,59 @@ export function ItemizedReceiptStep() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
       <BillWizardNavBar
         currentPath="/bills/new/itemized"
         onBack={() => navigate({ to: "/bills/new/upload", viewTransition: true })}
         step={2}
         totalSteps={5}
       />
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Step 2</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">
-          Review itemized receipt.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-          Items are shown in a table by default. Tap edit to open a phone-friendly
-          modal and adjust names, prices, tax, and tip.
-        </p>
-        <div className="mt-4">
-          <LocalDraftDisclosure />
-        </div>
-      </section>
+      <BillWizardHero
+        description="Edit names and prices in the table, or open an item for the full form. Tax, tip, and totals stay in sync with your FX rate."
+        eyebrow="Itemized"
+        step={2}
+        title="Review itemized receipt."
+        trailing={<LocalDraftDisclosure />}
+      />
 
       <ReceiptPreviewRail
         compact
+        compactSinglePreview
         receiptImageUrls={draft?.receipt.pages.map((page) => page.ufsUrl) ?? []}
         title={draft?.receipt.parsed?.title ?? "Receipt"}
       />
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <article className="panel min-w-0 p-6 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start lg:gap-6">
+        <article className="panel min-w-0 p-5 sm:p-7">
+          <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="eyebrow">Line items</p>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Check names and prices first, then adjust tax, tip, and the final
-                totals below.
+              <p className="eyebrow text-[0.65rem]">Line items</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Fix names and prices here; tax, tip, and FX live below.
               </p>
             </div>
-            <div className="text-right text-xs text-[var(--muted)]">
-              <p>
-                1 USD = {parsedReceipt.fxSnapshot.foreignUnitsPerUsd}{" "}
-                {parsedReceipt.currencyCode}
+            {parsedReceipt.confidence != null ? (
+              <p className="text-[0.65rem] text-[var(--muted)]">
+                Parse confidence {(parsedReceipt.confidence * 100).toFixed(0)}%
               </p>
-              <p>
-                As of{" "}
-                {parsedReceipt.fxSnapshot.lastUpdatedAt ??
-                  parsedReceipt.fxSnapshot.date}
-              </p>
-            </div>
+            ) : null}
           </div>
-          {parsedReceipt.confidence != null ? (
-            <p className="mt-3 text-xs text-[var(--muted)]">
-              Model confidence: {(parsedReceipt.confidence * 100).toFixed(0)}%
-            </p>
-          ) : null}
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)]">
-            <Table>
+          <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+            <Table className="min-w-[28rem] md:min-w-full">
               <TableHeader className="bg-[var(--surface-2)]">
                 <TableRow className="border-[var(--line)] hover:bg-transparent">
-                  <TableHead className="px-4 py-3 font-semibold text-[var(--muted)]">
+                  <TableHead className="px-3 py-2.5 text-left text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
                     Name
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-right font-semibold text-[var(--muted)]">
+                  <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
                     {parsedReceipt.currencyCode}
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-right font-semibold text-[var(--muted)]">
+                  <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
                     USD
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-right font-semibold text-[var(--muted)]">
-                    Actions
+                  <TableHead className="w-[4.5rem] px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:w-auto sm:px-4 sm:py-3">
+                    <span className="hidden sm:inline">Edit</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -368,7 +352,7 @@ export function ItemizedReceiptStep() {
                     className="border-[var(--line)] hover:bg-[var(--surface-2)]"
                     key={item.id}
                   >
-                    <TableCell className="max-w-[18rem] px-4 py-3">
+                    <TableCell className="max-w-[14rem] px-3 py-2 sm:max-w-[18rem] sm:px-4 sm:py-3">
                       <p className="truncate font-semibold text-[var(--ink)]">
                         {item.translatedName}
                       </p>
@@ -376,16 +360,17 @@ export function ItemizedReceiptStep() {
                         {item.foreignName}
                       </p>
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-right tabular-nums text-[var(--ink)]">
+                    <TableCell className="px-3 py-2 text-right tabular-nums text-[var(--ink)] sm:px-4 sm:py-3">
                       {item.foreignPrice.toFixed(2)}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-right tabular-nums font-semibold text-[var(--ink)]">
+                    <TableCell className="px-3 py-2 text-right tabular-nums font-semibold text-[var(--ink)] sm:px-4 sm:py-3">
                       ${item.usdPrice.toFixed(2)}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-right">
+                    <TableCell className="px-3 py-2 text-right sm:px-4 sm:py-3">
                       <Button
-                        className="rounded-full border-[var(--line)] bg-white/70 px-3 text-[var(--ink)] hover:bg-white"
+                        className="h-8 rounded-full border-[var(--line)] bg-white/70 px-3 text-xs text-[var(--ink)] hover:bg-white"
                         onClick={() => setEditingItemId(item.id)}
+                        size="sm"
                         variant="outline"
                       >
                         Edit
@@ -412,16 +397,15 @@ export function ItemizedReceiptStep() {
             parsedReceipt={parsedReceipt}
           />
 
-          <section className="mt-6 border-t border-[var(--line)] pt-6">
+          <section className="mt-6 border-t border-[var(--line)] pt-5">
             <div>
-              <p className="eyebrow">Tax, tip, and totals</p>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Empty fields stay blank. Valid values still sync across both
-                currencies.
+              <p className="eyebrow text-[0.65rem]">Tax, tip, totals</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Values sync across currencies using your FX snapshot.
               </p>
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <label className="grid gap-1 text-xs">
                 <span className="text-[var(--muted)]">Tax ({parsedReceipt.currencyCode})</span>
                 <Input
@@ -503,9 +487,9 @@ export function ItemizedReceiptStep() {
               </Button>
             </div>
 
-            <div className="mt-6 rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface-2)] p-5">
-              <p className="eyebrow">Updated totals</p>
-              <div className="mt-4 grid gap-5 lg:grid-cols-2">
+            <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 sm:px-4 sm:py-4">
+              <p className="eyebrow text-[0.65rem]">Updated totals</p>
+              <div className="mt-3 grid gap-4 lg:grid-cols-2 lg:gap-6">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
                     {parsedReceipt.currencyCode}
@@ -574,15 +558,24 @@ export function ItemizedReceiptStep() {
           </section>
         </article>
 
-        <aside className="panel p-6 lg:sticky lg:top-6">
-          <p className="eyebrow mb-3">Next</p>
-          <ol className="space-y-3 text-sm leading-6 text-[var(--muted)]">
-            <li>1. Upload and parse receipt pages.</li>
-            <li>2. Review/edit itemized receipt.</li>
-            <li>3. Add people who split the bill.</li>
+        <aside className="panel p-5 sm:p-6 lg:sticky lg:top-5">
+          <p className="eyebrow mb-3 text-[0.65rem]">Next</p>
+          <ol className="space-y-2.5 text-sm leading-relaxed text-[var(--muted)]">
+            <li className="flex gap-2">
+              <span className="font-semibold tabular-nums text-[var(--accent)]">1</span>
+              <span>Upload & parse</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="font-semibold tabular-nums text-[var(--accent)]">2</span>
+              <span>Review line items (you are here)</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="font-semibold tabular-nums text-[var(--accent)]">3</span>
+              <span>Add who split the bill</span>
+            </li>
           </ol>
           <Button
-            className="mt-8 w-full justify-center rounded-full border-0 bg-[var(--accent-strong)] py-6 text-white hover:bg-[var(--accent)]"
+            className="mt-6 w-full justify-center rounded-full border-0 bg-[var(--accent-strong)] py-5 text-white hover:bg-[var(--accent)] sm:mt-8 sm:py-6"
             onClick={() =>
               navigate({ to: "/bills/new/participants", viewTransition: true })
             }
