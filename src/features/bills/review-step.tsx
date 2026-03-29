@@ -192,7 +192,6 @@ export function ReviewStep() {
   return (
     <div className="space-y-6">
       <BillWizardNavBar
-        backLabel="Back to assign"
         currentPath="/bills/new/review"
         onBack={() => navigate({ to: "/bills/new/assign", viewTransition: true })}
         step={5}

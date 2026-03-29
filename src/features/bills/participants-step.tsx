@@ -193,7 +193,6 @@ export function ParticipantsStep() {
         }
         step={3}
         totalSteps={5}
-        backLabel="Back to itemized receipt"
       />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
         <div className="flex gap-6 sm:gap-8">

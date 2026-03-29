@@ -295,7 +295,6 @@ export function ItemizedReceiptStep() {
         onBack={() => navigate({ to: "/bills/new/upload", viewTransition: true })}
         step={2}
         totalSteps={5}
-        backLabel="Back to upload"
       />
       <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
         <p className="eyebrow mb-3">Step 2</p>

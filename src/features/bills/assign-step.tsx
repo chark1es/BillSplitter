@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   assignmentMapsEqualForItems,
   buildBillSummary,
+  buildCompactItemList,
   hydrateBillWithAssignments,
 } from "../../lib/bill-calculations";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
@@ -300,46 +301,58 @@ export function AssignStep() {
           </div>
         </article>
 
-        <aside className="panel space-y-3 p-4 sm:p-5 xl:sticky xl:top-6">
-          <p className="eyebrow text-[0.65rem]">Live split</p>
-          <div className="space-y-2.5">
-            {summary.summaries.map(({ participant, total, items }) => {
-              const itemLabel =
-                items.length === 0
-                  ? "No items yet"
-                  : items.map(({ item }) => item.name).join(", ");
-              return (
-                <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)]/80 px-2.5 py-2" key={participant.id}>
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="avatar-badge h-8 w-8 shrink-0 text-[0.65rem]"
-                        style={{ backgroundColor: participant.color }}
-                      >
-                        {participant.initials}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-sm font-semibold text-[var(--ink)]">
+        <aside className="panel space-y-4 p-4 sm:p-5 xl:sticky xl:top-6">
+          <div>
+            <div className="mb-2 flex items-end justify-between gap-3">
+              <p className="eyebrow text-[0.62rem] leading-none">Live split</p>
+              <span className="text-[0.65rem] font-semibold tabular-nums text-[var(--muted)]">
+                ${summary.grandTotal.toFixed(2)}
+                <span className="ml-1 font-normal opacity-80">total</span>
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-gradient-to-b from-white/80 to-[var(--surface-2)]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+              {summary.summaries.map(({ participant, total, items }, idx) => {
+                const { visibleNames, hiddenCount } = buildCompactItemList(items, 2);
+                const itemLabel =
+                  items.length === 0
+                    ? "No items yet"
+                    : hiddenCount > 0
+                      ? `${visibleNames.join(", ")} · +${hiddenCount} more`
+                      : visibleNames.join(", ");
+                return (
+                  <div
+                    className={`flex gap-2 px-2.5 py-1.5 sm:gap-2.5 sm:px-3 sm:py-2 ${idx > 0 ? "border-t border-[var(--line)]/70" : ""}`}
+                    key={participant.id}
+                  >
+                    <span
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[0.55rem] font-extrabold leading-none text-white ring-1 ring-black/[0.06]"
+                      style={{ backgroundColor: participant.color }}
+                    >
+                      {participant.initials}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1">
+                          <span className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--ink)]">
                             {participant.name}
                           </span>
                           <ParticipantPaidBadge isSelf={participant.isSelf} size="compact" />
                         </span>
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
-                      ${total.toFixed(2)}
-                    </span>
+                        <span className="shrink-0 text-[0.8125rem] font-semibold tabular-nums tracking-tight text-[var(--ink)]">
+                          ${total.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-1 text-[0.65rem] leading-snug text-[var(--muted)]">
+                        {itemLabel}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1.5 line-clamp-2 pl-10 text-[0.7rem] leading-snug text-[var(--muted)]">
-                    {itemLabel}
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <p className="text-xs text-[var(--muted)]">
+          <p className="text-[0.7rem] leading-relaxed text-[var(--muted)]">
             {saveStatus === "saving"
               ? "Saving item picks…"
               : saveStatus === "saved"
