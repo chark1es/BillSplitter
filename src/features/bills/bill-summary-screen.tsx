@@ -4,6 +4,13 @@ import { buildBillSummary } from "../../lib/bill-calculations";
 import type { BillDetail } from "../../lib/types";
 import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { ReceiptPreviewRail } from "./receipt-preview-rail";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "#/components/ui/dialog";
 
 type BillSummaryScreenProps = {
   bill: BillDetail;
@@ -78,10 +85,18 @@ export function BillSummaryScreen({
   sidePanel,
 }: BillSummaryScreenProps) {
   const summary = useMemo(() => buildBillSummary(bill), [bill]);
-  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const [exportBusy, setExportBusy] = useState<"idle" | "copy" | "file" | "share">("idle");
   const [exportError, setExportError] = useState<string | null>(null);
+  const selectedParticipantSummary = useMemo(
+    () =>
+      selectedParticipantId
+        ? summary.summaries.find((entry) => entry.participant.id === selectedParticipantId) ??
+          null
+        : null,
+    [selectedParticipantId, summary.summaries],
+  );
 
   const runExport = useCallback(async () => {
     const node = exportRef.current;
@@ -307,7 +322,6 @@ export function BillSummaryScreen({
           <div className="mt-5 grid gap-3">
             {summary.summaries.map(
               ({ participant, total, items, taxTipShare, itemSubtotal }) => {
-                const isExpanded = expandedIds[participant.id] ?? false;
                 const itemCount = items.length;
 
                 return (
@@ -348,32 +362,14 @@ export function BillSummaryScreen({
                         {items.length > 0 ? (
                           <button
                             className="mt-1.5 text-xs font-semibold text-[var(--accent)]"
-                            onClick={() =>
-                              setExpandedIds((current) => ({
-                                ...current,
-                                [participant.id]: !isExpanded,
-                              }))
-                            }
+                            onClick={() => setSelectedParticipantId(participant.id)}
                             type="button"
                           >
-                            {isExpanded ? "Hide line items" : "Line items"}
+                            View line items
                           </button>
                         ) : null}
                       </div>
                     </div>
-
-                    {isExpanded && items.length > 0 ? (
-                      <div className="mt-3 space-y-1 border-t border-[var(--line)] pt-3 text-sm">
-                        {items.map((entry) => (
-                          <div className="receipt-row !py-1.5 !px-0" key={entry.item.id}>
-                            <span className="text-[var(--muted)]">{entry.item.name}</span>
-                            <span className="font-semibold tabular-nums text-[var(--ink)]">
-                              ${entry.share.toFixed(2)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
                   </article>
                 );
               },
@@ -385,12 +381,83 @@ export function BillSummaryScreen({
           {sidePanel}
           <ReceiptPreviewRail
             compact
+            compactSinglePreview
             imageNames={bill.imageNames}
             receiptImageUrls={bill.receiptImageUrls}
             title={bill.title}
           />
         </div>
       </section>
+
+      <Dialog onOpenChange={(open) => !open && setSelectedParticipantId(null)} open={Boolean(selectedParticipantSummary)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface)] p-5 sm:max-w-xl sm:p-6">
+          {selectedParticipantSummary ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="display text-3xl text-[var(--ink)]">
+                  {selectedParticipantSummary.participant.name}
+                </DialogTitle>
+                <DialogDescription className="text-[var(--muted)]">
+                  Item-level split and tax/tip allocation.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="mt-1 flex items-center gap-2">
+                <span
+                  className="avatar-badge h-8 w-8 text-[0.6rem]"
+                  style={{ backgroundColor: selectedParticipantSummary.participant.color }}
+                >
+                  {selectedParticipantSummary.participant.initials}
+                </span>
+                <p className="text-xs text-[var(--muted)]">
+                  {selectedParticipantSummary.items.length} item
+                  {selectedParticipantSummary.items.length === 1 ? "" : "s"}
+                </p>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {selectedParticipantSummary.items.map((entry) => (
+                  <div
+                    className="receipt-row rounded-xl border border-[var(--line)] !px-3"
+                    key={entry.item.id}
+                  >
+                    <span className="text-[var(--muted)]">{entry.item.name}</span>
+                    <span className="font-semibold tabular-nums text-[var(--ink)]">
+                      ${entry.share.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+                {selectedParticipantSummary.items.length === 0 ? (
+                  <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--muted)]">
+                    No line items assigned.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[var(--muted)]">Items subtotal</span>
+                  <span className="font-semibold tabular-nums text-[var(--ink)]">
+                    ${selectedParticipantSummary.itemSubtotal.toFixed(2)}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-4">
+                  <span className="text-[var(--muted)]">Tax & tip</span>
+                  <span className="tabular-nums text-[var(--ink)]">
+                    ${selectedParticipantSummary.taxTipShare.toFixed(2)}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
+                  <span className="font-semibold text-[var(--ink)]">Total</span>
+                  <span className="font-bold tabular-nums text-[var(--ink)]">
+                    ${selectedParticipantSummary.total.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -59,6 +59,12 @@ export function ItemizedReceiptStep() {
   const [editingTranslatedName, setEditingTranslatedName] = useState("");
   const [editingForeignPriceInput, setEditingForeignPriceInput] = useState("");
   const [editingUsdPriceInput, setEditingUsdPriceInput] = useState("");
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [newForeignName, setNewForeignName] = useState("");
+  const [newTranslatedName, setNewTranslatedName] = useState("");
+  const [newForeignPriceInput, setNewForeignPriceInput] = useState("");
+  const [newUsdPriceInput, setNewUsdPriceInput] = useState("");
+  const [newItemError, setNewItemError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -285,6 +291,95 @@ export function ItemizedReceiptStep() {
     }));
   };
 
+  const resetNewItemForm = () => {
+    setNewForeignName("");
+    setNewTranslatedName("");
+    setNewForeignPriceInput("");
+    setNewUsdPriceInput("");
+    setNewItemError(null);
+  };
+
+  const handleNewItemPriceChange = (currency: "foreign" | "usd", value: string) => {
+    const rate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
+
+    if (currency === "foreign") {
+      setNewForeignPriceInput(value);
+      if (!value.trim()) {
+        setNewUsdPriceInput("");
+        return;
+      }
+      const next = Number(value);
+      if (!Number.isFinite(next)) return;
+      setNewUsdPriceInput(formatOptionalMoneyInput(roundMoney(next / rate)));
+      return;
+    }
+
+    setNewUsdPriceInput(value);
+    if (!value.trim()) {
+      setNewForeignPriceInput("");
+      return;
+    }
+    const next = Number(value);
+    if (!Number.isFinite(next)) return;
+    setNewForeignPriceInput(formatOptionalMoneyInput(roundMoney(next * rate)));
+  };
+
+  const handleAddItemSubmit = () => {
+    if (!parsedReceipt) return;
+
+    const foreignName = newForeignName.trim();
+    const translatedName = newTranslatedName.trim();
+    const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd ?? 1;
+    const foreignValue = newForeignPriceInput.trim()
+      ? Number(newForeignPriceInput)
+      : Number.NaN;
+    const usdValue = newUsdPriceInput.trim() ? Number(newUsdPriceInput) : Number.NaN;
+    const hasForeign = Number.isFinite(foreignValue);
+    const hasUsd = Number.isFinite(usdValue);
+
+    if (!foreignName && !translatedName) {
+      setNewItemError("Add at least one item name.");
+      return;
+    }
+    if (!hasForeign && !hasUsd) {
+      setNewItemError("Add a valid price in either currency.");
+      return;
+    }
+
+    const foreignPrice = hasForeign ? roundMoney(foreignValue) : roundMoney(usdValue * rate);
+    const usdPrice = hasUsd ? roundMoney(usdValue) : roundMoney(foreignValue / rate);
+
+    updateParsedReceipt((parsed) => ({
+      ...parsed,
+      items: [
+        ...parsed.items,
+        {
+          id:
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          foreignName: foreignName || translatedName,
+          translatedName: translatedName || foreignName,
+          foreignPrice,
+          usdPrice,
+        },
+      ],
+    }));
+
+    resetNewItemForm();
+    setIsAddItemOpen(false);
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    updateParsedReceipt((parsed) => ({
+      ...parsed,
+      items: parsed.items.filter((item) => item.id !== itemId),
+    }));
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+    }
+  };
+
   if (!parsedReceipt) {
     return null;
   }
@@ -321,11 +416,24 @@ export function ItemizedReceiptStep() {
                 Fix names and prices here; tax, tip, and FX live below.
               </p>
             </div>
-            {parsedReceipt.confidence != null ? (
-              <p className="text-[0.65rem] text-[var(--muted)]">
-                Parse confidence {(parsedReceipt.confidence * 100).toFixed(0)}%
-              </p>
-            ) : null}
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              {parsedReceipt.confidence != null ? (
+                <p className="text-[0.65rem] text-[var(--muted)]">
+                  Parse confidence {(parsedReceipt.confidence * 100).toFixed(0)}%
+                </p>
+              ) : null}
+              <Button
+                className="rounded-full border-[var(--line)] bg-white/85 px-4 text-xs font-semibold text-[var(--ink)] hover:bg-white"
+                onClick={() => {
+                  resetNewItemForm();
+                  setIsAddItemOpen(true);
+                }}
+                size="sm"
+                variant="outline"
+              >
+                Add item
+              </Button>
+            </div>
           </div>
 
           <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)]">
@@ -341,8 +449,8 @@ export function ItemizedReceiptStep() {
                   <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
                     USD
                   </TableHead>
-                  <TableHead className="w-[4.5rem] px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:w-auto sm:px-4 sm:py-3">
-                    <span className="hidden sm:inline">Edit</span>
+                  <TableHead className="w-[7.5rem] px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:w-auto sm:px-4 sm:py-3">
+                    <span className="hidden sm:inline">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -367,14 +475,24 @@ export function ItemizedReceiptStep() {
                       ${item.usdPrice.toFixed(2)}
                     </TableCell>
                     <TableCell className="px-3 py-2 text-right sm:px-4 sm:py-3">
-                      <Button
-                        className="h-8 rounded-full border-[var(--line)] bg-white/70 px-3 text-xs text-[var(--ink)] hover:bg-white"
-                        onClick={() => setEditingItemId(item.id)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Edit
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          className="h-8 rounded-full border-[var(--line)] bg-white/70 px-3 text-xs text-[var(--ink)] hover:bg-white"
+                          onClick={() => setEditingItemId(item.id)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          className="h-8 rounded-full border-rose-200 bg-rose-50 px-3 text-xs text-rose-700 hover:bg-rose-100"
+                          onClick={() => handleDeleteItem(item.id)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -682,6 +800,104 @@ export function ItemizedReceiptStep() {
               </div>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(nextOpen) => {
+          setIsAddItemOpen(nextOpen);
+          if (!nextOpen) {
+            resetNewItemForm();
+          }
+        }}
+        open={isAddItemOpen}
+      >
+        <DialogContent className="rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface)] p-5 sm:max-w-lg sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="display text-3xl text-[var(--ink)]">Add item</DialogTitle>
+            <DialogDescription className="text-[var(--muted)]">
+              Add a missing line from the receipt. Price fields auto-sync with your FX rate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-5">
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                Original name ({parsedReceipt.currencyCode})
+              </Label>
+              <Input
+                className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                onChange={(e) => setNewForeignName(e.target.value)}
+                placeholder="e.g. Yakisoba"
+                type="text"
+                value={newForeignName}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                Translated name (USD)
+              </Label>
+              <Input
+                className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                onChange={(e) => setNewTranslatedName(e.target.value)}
+                placeholder="e.g. Fried noodles"
+                type="text"
+                value={newTranslatedName}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                  Price ({parsedReceipt.currencyCode})
+                </Label>
+                <Input
+                  className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                  inputMode="decimal"
+                  onChange={(e) => handleNewItemPriceChange("foreign", e.target.value)}
+                  placeholder={`0.00 ${parsedReceipt.currencyCode}`}
+                  type="text"
+                  value={newForeignPriceInput}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                  Price (USD)
+                </Label>
+                <Input
+                  className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                  inputMode="decimal"
+                  onChange={(e) => handleNewItemPriceChange("usd", e.target.value)}
+                  placeholder="0.00 USD"
+                  type="text"
+                  value={newUsdPriceInput}
+                />
+              </div>
+            </div>
+
+            {newItemError ? (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {newItemError}
+              </p>
+            ) : null}
+
+            <div className="flex justify-end gap-2">
+              <Button
+                className="rounded-full border-[var(--line)] bg-white/70 px-5 text-[var(--ink)] hover:bg-white"
+                onClick={() => setIsAddItemOpen(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="rounded-full border-0 bg-[var(--accent-strong)] px-5 text-white hover:bg-[var(--accent)]"
+                onClick={handleAddItemSubmit}
+              >
+                Add line item
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
