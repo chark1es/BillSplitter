@@ -41,7 +41,7 @@ function SplitSpendExportCard({
           ({ participant, total, items, taxTipShare }) => (
             <li className="text-sm" key={participant.id}>
               <div className="flex items-start justify-between gap-3">
-                <span className="min-w-0 font-semibold">{participant.name}</span>
+                <span className="min-w-0 truncate font-semibold">{participant.name}</span>
                 <span className="shrink-0 tabular-nums font-bold">${total.toFixed(2)}</span>
               </div>
               {items.length > 0 ? (
@@ -93,6 +93,8 @@ export function BillSummaryScreen({
       pixelRatio: 2,
       backgroundColor: "#ffffff",
       cacheBust: true,
+      width: node.offsetWidth,
+      height: node.offsetHeight,
     });
     return dataUrl;
   }, []);
@@ -179,10 +181,9 @@ export function BillSummaryScreen({
     <div className={wizardStep != null ? "space-y-5 sm:space-y-6" : "space-y-6"}>
       <div
         aria-hidden
-        className="pointer-events-none fixed left-[-10000px] top-0 z-[-1]"
-        style={{ width: 380 }}
+        className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-max"
       >
-        <div className="p-1" ref={exportRef}>
+        <div ref={exportRef}>
           <SplitSpendExportCard bill={bill} summary={summary} />
         </div>
       </div>
