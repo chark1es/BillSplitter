@@ -13,13 +13,21 @@ import { AppShell } from "../components/layout/app-shell";
 import { authClient } from "../lib/auth/auth-client";
 import { getBuildMarker } from "../lib/build-info";
 import { getViewerSession } from "../lib/auth/session.functions";
+import { viewerSessionQueryKey } from "../lib/queries";
 import type { RouterContext } from "../lib/router-context";
 
 import appCss from "../styles.css?url";
 
+const viewerSessionStaleTimeMs = 60_000;
+
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async (ctx) => {
-    const auth = await getViewerSession();
+    const auth = await ctx.context.queryClient.ensureQueryData({
+      queryKey: viewerSessionQueryKey,
+      queryFn: () => getViewerSession(),
+      staleTime: viewerSessionStaleTimeMs,
+      gcTime: 5 * 60_000,
+    });
     if (auth.initialToken) {
       ctx.context.convexQueryClient.serverHttpClient?.setAuth(auth.initialToken);
     }
@@ -129,17 +137,19 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         {children}
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "TanStack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        {import.meta.env.DEV ? (
+          <TanStackDevtools
+            config={{
+              position: "bottom-right",
+            }}
+            plugins={[
+              {
+                name: "TanStack Router",
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+        ) : null}
         <Scripts />
       </body>
     </html>

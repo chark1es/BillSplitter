@@ -1,7 +1,10 @@
 import type { PropsWithChildren } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { authClient } from "../../lib/auth/auth-client";
+import { viewerSessionQueryKey } from "../../lib/queries";
 import type { ViewerProfile, ViewerSession } from "../../lib/types";
+import { useStartNewBill } from "../../features/bills/use-start-new-bill";
 
 export function AppShell({
   children,
@@ -11,6 +14,8 @@ export function AppShell({
 }>) {
   const navigate = useNavigate();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const startNewBill = useStartNewBill();
 
   const handleSignOut = async () => {
     if (auth.isBypassMode) {
@@ -18,6 +23,7 @@ export function AppShell({
     }
 
     await authClient.signOut();
+    queryClient.removeQueries({ queryKey: viewerSessionQueryKey });
     await router.invalidate();
     navigate({ to: "/login" });
   };
@@ -51,13 +57,13 @@ export function AppShell({
             >
               Dashboard
             </Link>
-            <Link
-              to="/bills/new/upload"
+            <button
               className="nav-pill"
-              activeProps={{ className: "nav-pill is-active" }}
+              onClick={startNewBill}
+              type="button"
             >
               New bill
-            </Link>
+            </button>
             <Link
               to="/settings"
               className="nav-pill"

@@ -41,6 +41,8 @@ export type BillItem = {
   name: string;
   originalLabel: string | undefined;
   price: number;
+  foreignPrice?: number;
+  usdPrice?: number;
 };
 
 export type BillAssignment = {
@@ -55,6 +57,12 @@ export type BillDetail = {
   status: BillStatus;
   imageNames: string[];
   receiptImageUrls: string[];
+  receiptMetadata: {
+    currencyCode: string;
+    fxSnapshot: FxSnapshot;
+    taxForeignAmount: number;
+    tipForeignAmount: number;
+  } | null;
   createdAt: number;
   updatedAt: number;
   grandTotal: number;

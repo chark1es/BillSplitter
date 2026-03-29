@@ -61,20 +61,18 @@ export const hasConfiguredConvex = (value?: string | null) =>
   );
 
 export const getPublicEnv = () => {
-  // In SSR context (Node.js/Bun), prefer runtime process.env over baked-in import.meta.env
-  // This allows production deployments to override URLs without rebuilding
-  const isSSR = typeof process !== "undefined" && process.env;
+  // On the server, prefer runtime process.env so deployments can override URLs
+  // without rebuilding. In the browser, always prefer Vite's baked import.meta.env.
+  const isSSR = import.meta.env.SSR;
+  const runtimeAppUrl = normalizeAbsoluteUrl(process.env.VITE_APP_URL);
+  const bakedAppUrl = normalizeAbsoluteUrl(import.meta.env.VITE_APP_URL);
+  const runtimeConvexUrl = normalizeAbsoluteUrl(process.env.VITE_CONVEX_URL);
+  const bakedConvexUrl = normalizeAbsoluteUrl(import.meta.env.VITE_CONVEX_URL);
 
   return {
-    appUrl:
-      (isSSR
-        ? normalizeAbsoluteUrl(process.env.VITE_APP_URL)
-        : normalizeAbsoluteUrl(import.meta.env.VITE_APP_URL)) ||
-      FALLBACK_APP_URL,
+    appUrl: (isSSR ? runtimeAppUrl ?? bakedAppUrl : bakedAppUrl ?? runtimeAppUrl) || FALLBACK_APP_URL,
     convexUrl:
-      (isSSR
-        ? normalizeAbsoluteUrl(process.env.VITE_CONVEX_URL)
-        : normalizeAbsoluteUrl(import.meta.env.VITE_CONVEX_URL)) ||
+      (isSSR ? runtimeConvexUrl ?? bakedConvexUrl : bakedConvexUrl ?? runtimeConvexUrl) ||
       FALLBACK_CONVEX_URL,
   };
 };

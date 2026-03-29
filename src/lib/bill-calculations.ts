@@ -106,6 +106,30 @@ export type BillSummaryRow = {
   items: Array<{ item: BillDetail["items"][number]; share: number }>;
 };
 
+export const buildCompactItemList = (
+  items: Array<{ item: BillDetail["items"][number] }>,
+  maxVisible = 3,
+) => {
+  const names = items.map(({ item }) => item.name);
+  return {
+    visibleNames: names.slice(0, maxVisible),
+    hiddenCount: Math.max(names.length - maxVisible, 0),
+  };
+};
+
+export const buildShareSummaryText = (bill: BillDetail) => {
+  const summary = buildBillSummary(bill);
+  const lines = [
+    `${bill.title}: $${summary.grandTotal.toFixed(2)}`,
+    ...summary.summaries.map(
+      ({ participant, total, items }) =>
+        `${participant.name}: $${total.toFixed(2)} (${buildCompactItemList(items, 2).visibleNames.join(", ") || "No items"})`,
+    ),
+  ];
+
+  return lines.join("\n");
+};
+
 export const buildBillSummary = (bill: BillDetail) => {
   const subtotalAll = itemsSubtotal(bill);
 

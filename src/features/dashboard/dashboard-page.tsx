@@ -5,6 +5,8 @@ import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import { fairShareQueries } from "../../lib/queries";
 import type { DashboardBill } from "../../lib/types";
+import { useReopenBillForEditing } from "../bills/use-reopen-bill-for-editing";
+import { useStartNewBill } from "../bills/use-start-new-bill";
 
 const formatMoney = (value: number) =>
   new Intl.NumberFormat("en-US", {
@@ -21,6 +23,8 @@ const formatDate = (value: number) =>
 export function DashboardPage({ initialBills }: { initialBills: DashboardBill[] }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const reopenBillForEditing = useReopenBillForEditing();
+  const startNewBill = useStartNewBill();
   const billsQuery = useQuery({
     ...fairShareQueries.bills.list(),
     initialData: initialBills,
@@ -91,7 +95,7 @@ export function DashboardPage({ initialBills }: { initialBills: DashboardBill[] 
           <div className="flex flex-wrap items-center gap-3">
             <button
               className="primary-button"
-              onClick={() => navigate({ to: "/bills/new/upload" })}
+              onClick={startNewBill}
               type="button"
             >
               Start a new bill
@@ -182,6 +186,15 @@ export function DashboardPage({ initialBills }: { initialBills: DashboardBill[] 
                         type="button"
                       >
                         Delete
+                      </button>
+                    ) : null}
+                    {bill.status === "confirmed" ? (
+                      <button
+                        className="secondary-button"
+                        onClick={() => void reopenBillForEditing(bill.id)}
+                        type="button"
+                      >
+                        Edit bill
                       </button>
                     ) : null}
                     <button

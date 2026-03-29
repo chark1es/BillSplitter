@@ -48,6 +48,7 @@ export const parseReceiptFromUrls = createServerFn({ method: "POST" })
 Rules:
 - Determine "detectedCurrencyCode" from the currency actually printed on the receipt.
 - For foreign receipts, return the local ISO 4217 code used on the receipt (JPY, VND, EUR, etc.), not USD, unless the receipt is explicitly denominated in USD.
+- Do not infer or return subtotal or total fields. The app calculates subtotal and total manually from item lines plus tax/tip.
 - Use the detected currency code as the unit for every monetary value.
 - Output raw amounts in detectedCurrencyCode only. Do NOT convert amounts to USD in the model output.
 - Use "foreignName" verbatim from the receipt. Use "translatedName" as the English display name.

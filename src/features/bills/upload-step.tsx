@@ -2,11 +2,18 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { parseReceiptFromUrls } from "../../lib/ai/parse-receipt.fn";
 import { convertReceiptFileToWebp } from "../../lib/receipt/image-to-webp";
+import {
+  calculateParsedReceiptGrandTotalForeign,
+  calculateParsedReceiptGrandTotalUsd,
+  calculateParsedReceiptSubtotalForeign,
+  calculateParsedReceiptSubtotalUsd,
+} from "../../lib/receipt/receipt-totals";
 import { useUploadThing } from "../../lib/uploadthing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ExchangeRateCard } from "./exchange-rate-card";
+import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 
 type PreviewRow = {
   id: string;
@@ -20,6 +27,7 @@ type PreviewRow = {
 export function UploadStep() {
   const navigate = useNavigate();
   const inputId = useId();
+  useBillWizardRoutePreload("/bills/new/upload");
 
   const { draft, ensureDraft, patchDraft } = useActiveBillDraft();
   useEffect(() => {
@@ -43,20 +51,10 @@ export function UploadStep() {
     readyUrls.length > 0 && uploadRows.length === 0 && !isUploading && !isParsing;
 
   const computedSubtotalUsd = parsedReceipt
-    ? parsedReceipt.items.reduce((sum, item) => sum + item.usdPrice, 0)
+    ? calculateParsedReceiptSubtotalUsd(parsedReceipt)
     : 0;
   const computedSubtotalForeign = parsedReceipt
-    ? parsedReceipt.items.reduce((sum, item) => sum + item.foreignPrice, 0)
-    : 0;
-  const computedGrandTotalUsd = parsedReceipt
-    ? computedSubtotalUsd +
-      parsedReceipt.taxUsdAmount +
-      parsedReceipt.tipUsdAmount
-    : 0;
-  const computedGrandTotalForeign = parsedReceipt
-    ? computedSubtotalForeign +
-      parsedReceipt.taxForeignAmount +
-      parsedReceipt.tipForeignAmount
+    ? calculateParsedReceiptSubtotalForeign(parsedReceipt)
     : 0;
   const parsedReceiptRecord = parsedReceipt as Record<string, unknown> | null;
   const discountForeignAmount =
@@ -71,8 +69,18 @@ export function UploadStep() {
       : parsedReceiptRecord && typeof parsedReceiptRecord.discountAmountUsd === "number"
         ? parsedReceiptRecord.discountAmountUsd
         : 0;
-  const adjustedGrandTotalForeign = computedGrandTotalForeign - discountForeignAmount;
-  const adjustedGrandTotalUsd = computedGrandTotalUsd - discountUsdAmount;
+  const adjustedGrandTotalForeign = parsedReceipt
+    ? calculateParsedReceiptGrandTotalForeign({
+        ...parsedReceipt,
+        discountForeignAmount,
+      })
+    : 0;
+  const adjustedGrandTotalUsd = parsedReceipt
+    ? calculateParsedReceiptGrandTotalUsd({
+        ...parsedReceipt,
+        discountUsdAmount,
+      })
+    : 0;
 
   const canProceed = Boolean(parsedReceipt) && !isParsing;
 
@@ -280,7 +288,8 @@ export function UploadStep() {
   return (
     <div className="space-y-6">
       <BillWizardNavBar
-        onBack={() => navigate({ to: "/dashboard" })}
+        currentPath="/bills/new/upload"
+        onBack={() => navigate({ to: "/dashboard", viewTransition: true })}
         step={1}
         totalSteps={5}
       />
@@ -568,6 +577,7 @@ export function UploadStep() {
               onClick={() =>
                 navigate({
                   to: "/bills/new/itemized",
+                  viewTransition: true,
                 })
               }
               type="button"

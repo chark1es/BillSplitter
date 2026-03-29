@@ -87,11 +87,26 @@ const itemsSubtotal = (items: { price: number }[]) =>
 /** Defaults for bills created before receiptImageUrls / tax / tip fields existed. */
 const billFinancialDefaults = (bill: {
   receiptImageUrls?: string[];
+  currencyCode?: string;
+  fxSnapshot?: {
+    baseCurrency: "USD";
+    currencyCode: string;
+    date: string;
+    foreignUnitsPerUsd: number;
+    lastUpdatedAt?: string;
+    rateSource?: "currencyapi" | "frankfurter" | "parity";
+  };
+  taxForeignAmount?: number;
+  tipForeignAmount?: number;
   taxAmount?: number;
   tipAmount?: number;
   taxTipMode?: "proportional" | "equal";
 }) => ({
   receiptImageUrls: bill.receiptImageUrls ?? [],
+  currencyCode: bill.currencyCode,
+  fxSnapshot: bill.fxSnapshot,
+  taxForeignAmount: bill.taxForeignAmount,
+  tipForeignAmount: bill.tipForeignAmount,
   taxAmount: bill.taxAmount ?? 0,
   tipAmount: bill.tipAmount ?? 0,
   taxTipMode: bill.taxTipMode ?? ("proportional" as const),
@@ -147,6 +162,15 @@ const billPayload = (
     status: bill.status,
     imageNames: bill.imageNames,
     receiptImageUrls: fin.receiptImageUrls,
+    receiptMetadata:
+      fin.currencyCode && fin.fxSnapshot
+        ? {
+            currencyCode: fin.currencyCode,
+            fxSnapshot: fin.fxSnapshot,
+            taxForeignAmount: fin.taxForeignAmount ?? fin.taxAmount,
+            tipForeignAmount: fin.tipForeignAmount ?? fin.tipAmount,
+          }
+        : null,
     createdAt: bill.createdAt,
     updatedAt: bill.updatedAt,
     grandTotal: bill.grandTotal,
@@ -164,6 +188,8 @@ const billPayload = (
       id: item._id,
       name: item.name,
       originalLabel: item.originalLabel,
+      foreignPrice: item.foreignPrice ?? item.price,
+      usdPrice: item.usdPrice ?? item.price,
       price: item.price,
     })),
     assignments: assignments.map((assignment) => ({
@@ -229,7 +255,81 @@ const parsedItemValidator = v.object({
   name: v.string(),
   price: v.number(),
   originalLabel: v.optional(v.string()),
+  foreignPrice: v.number(),
+  usdPrice: v.number(),
 });
+
+const receiptMetadataValidator = v.object({
+  currencyCode: v.string(),
+  fxSnapshot: v.object({
+    baseCurrency: v.literal("USD"),
+    currencyCode: v.string(),
+    date: v.string(),
+    foreignUnitsPerUsd: v.number(),
+    lastUpdatedAt: v.optional(v.string()),
+    rateSource: v.optional(
+      v.union(
+        v.literal("currencyapi"),
+        v.literal("frankfurter"),
+        v.literal("parity"),
+      ),
+    ),
+  }),
+  taxForeignAmount: v.number(),
+  tipForeignAmount: v.number(),
+});
+
+const insertBillItems = async (
+  ctx: MutationCtx,
+  billId: Id<"bills">,
+  items: Array<{
+    name: string;
+    price: number;
+    originalLabel?: string;
+    foreignPrice: number;
+    usdPrice: number;
+  }>,
+) => {
+  const itemIds: Id<"billItems">[] = [];
+  for (const [sortOrder, item] of items.entries()) {
+    const insertedId = await ctx.db.insert("billItems", {
+      billId,
+      name: item.name,
+      price: item.price,
+      originalLabel: item.originalLabel,
+      foreignPrice: item.foreignPrice,
+      usdPrice: item.usdPrice,
+      sortOrder,
+    });
+    itemIds.push(insertedId);
+  }
+  return itemIds;
+};
+
+const insertBillParticipants = async (
+  ctx: MutationCtx,
+  billId: Id<"bills">,
+  participants: Array<{
+    name: string;
+    initials: string;
+    color: string;
+    isSelf: boolean;
+  }>,
+) => {
+  const participantIds: Id<"billParticipants">[] = [];
+  for (const [sortOrder, participant] of participants.entries()) {
+    const insertedId = await ctx.db.insert("billParticipants", {
+      billId,
+      name: participant.name,
+      initials: participant.initials,
+      color: participant.color,
+      isSelf: participant.isSelf,
+      sortOrder,
+    });
+    participantIds.push(insertedId);
+  }
+  return participantIds;
+};
 
 export const createDraftBill = mutation({
   args: {
@@ -260,15 +360,7 @@ export const createDraftBill = mutation({
       updatedAt: timestamp,
     });
 
-    for (const [sortOrder, item] of args.items.entries()) {
-      await ctx.db.insert("billItems", {
-        billId,
-        name: item.name,
-        price: item.price,
-        originalLabel: item.originalLabel,
-        sortOrder,
-      });
-    }
+    await insertBillItems(ctx, billId, args.items);
 
     return { billId };
   },
@@ -276,10 +368,12 @@ export const createDraftBill = mutation({
 
 export const createConfirmedBill = mutation({
   args: {
+    billId: v.optional(v.id("bills")),
     receiptImageUrls: v.array(v.string()),
     title: v.optional(v.string()),
     items: v.array(parsedItemValidator),
     itemLocalIds: v.array(v.string()),
+    receiptMetadata: receiptMetadataValidator,
     taxAmount: v.number(),
     tipAmount: v.number(),
     taxTipMode: v.union(v.literal("proportional"), v.literal("equal")),
@@ -313,44 +407,80 @@ export const createConfirmedBill = mutation({
     const subtotal = itemsSubtotal(args.items);
     const grandTotal = subtotal + args.taxAmount + args.tipAmount;
 
-    const billId = await ctx.db.insert("bills", {
-      ownerId: user._id,
-      title: args.title?.trim() || "Receipt",
-      sourceType: "parsed-receipt",
-      status: "confirmed",
-      imageNames: [],
-      receiptImageUrls: args.receiptImageUrls,
-      grandTotal,
-      taxAmount: args.taxAmount,
-      tipAmount: args.tipAmount,
-      taxTipMode: args.taxTipMode,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      confirmedAt: timestamp,
-    });
+    let billId = args.billId;
+
+    if (billId) {
+      const bill = await loadBill(ctx, billId);
+      if (!bill) {
+        throw new Error("Bill not found");
+      }
+
+      const existingAssignments = await getBillAssignments(ctx, billId);
+      for (const assignment of existingAssignments) {
+        await ctx.db.delete(assignment._id);
+      }
+
+      const existingItems = await getBillItems(ctx, billId);
+      for (const item of existingItems) {
+        await ctx.db.delete(item._id);
+      }
+
+      const existingParticipants = await getBillParticipants(ctx, billId);
+      for (const participant of existingParticipants) {
+        await ctx.db.delete(participant._id);
+      }
+
+      await ctx.db.patch(billId, {
+        title: args.title?.trim() || "Receipt",
+        status: "confirmed",
+        imageNames: [],
+        receiptImageUrls: args.receiptImageUrls,
+        currencyCode: args.receiptMetadata.currencyCode,
+        fxSnapshot: args.receiptMetadata.fxSnapshot,
+        taxForeignAmount: args.receiptMetadata.taxForeignAmount,
+        tipForeignAmount: args.receiptMetadata.tipForeignAmount,
+        grandTotal,
+        taxAmount: args.taxAmount,
+        tipAmount: args.tipAmount,
+        taxTipMode: args.taxTipMode,
+        updatedAt: timestamp,
+        confirmedAt: bill.confirmedAt ?? timestamp,
+      });
+    } else {
+      billId = await ctx.db.insert("bills", {
+        ownerId: user._id,
+        title: args.title?.trim() || "Receipt",
+        sourceType: "parsed-receipt",
+        status: "confirmed",
+        imageNames: [],
+        receiptImageUrls: args.receiptImageUrls,
+        currencyCode: args.receiptMetadata.currencyCode,
+        fxSnapshot: args.receiptMetadata.fxSnapshot,
+        taxForeignAmount: args.receiptMetadata.taxForeignAmount,
+        tipForeignAmount: args.receiptMetadata.tipForeignAmount,
+        grandTotal,
+        taxAmount: args.taxAmount,
+        tipAmount: args.tipAmount,
+        taxTipMode: args.taxTipMode,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        confirmedAt: timestamp,
+      });
+    }
 
     const itemIdByLocalId = new Map<string, Id<"billItems">>();
-    for (const [sortOrder, item] of args.items.entries()) {
-      const insertedId = await ctx.db.insert("billItems", {
-        billId,
-        name: item.name,
-        price: item.price,
-        originalLabel: item.originalLabel,
-        sortOrder,
-      });
+    const insertedItemIds = await insertBillItems(ctx, billId, args.items);
+    for (const [sortOrder, insertedId] of insertedItemIds.entries()) {
       itemIdByLocalId.set(args.itemLocalIds[sortOrder], insertedId);
     }
 
     const participantIdByLocalId = new Map<string, Id<"billParticipants">>();
-    for (const [sortOrder, participant] of args.participants.entries()) {
-      const insertedId = await ctx.db.insert("billParticipants", {
-        billId,
-        name: participant.name,
-        initials: participant.initials,
-        color: participant.color,
-        isSelf: participant.isSelf,
-        sortOrder,
-      });
+    const insertedParticipantIds = await insertBillParticipants(
+      ctx,
+      billId,
+      args.participants,
+    );
+    for (const [sortOrder, insertedId] of insertedParticipantIds.entries()) {
       participantIdByLocalId.set(args.participantLocalIds[sortOrder], insertedId);
     }
 

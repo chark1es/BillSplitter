@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardPage } from "../../features/dashboard/dashboard-page";
-import { getDashboardSnapshot } from "../../lib/auth/session.functions";
+import { fairShareQueries } from "../../lib/queries";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  loader: () => getDashboardSnapshot(),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData({
+      ...fairShareQueries.bills.list(),
+    }),
   component: DashboardRoute,
 });
 

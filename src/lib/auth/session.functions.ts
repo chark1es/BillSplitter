@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
 import { getServerEnv, hasConfiguredConvex } from "../env";
 import { getServerAuth } from "./server-auth";
@@ -19,7 +18,7 @@ const isBypassMode = () => {
   return ["1", "true", "yes", "on"].includes(value);
 };
 
-// This depends on request cookies, so keep it non-cacheable across navigations.
+// Session is fetched every time this runs; the app caches results in React Query (see __root `beforeLoad`).
 export const getViewerSession = createServerFn({ method: "POST" }).handler(
   async () => {
     if (isBypassMode()) {
@@ -104,37 +103,3 @@ export const getViewerSession = createServerFn({ method: "POST" }).handler(
     }
   },
 );
-
-export const getDashboardSnapshot = createServerFn({ method: "POST" }).handler(
-  async () => {
-    const env = getServerEnv();
-    if (!hasConfiguredConvex(env.convexUrl) || !hasConfiguredConvex(env.convexSiteUrl)) {
-      return [];
-    }
-
-    const auth = getServerAuth();
-    try {
-      return await auth.fetchAuthQuery(api.bills.listBills, {});
-    } catch {
-      return [];
-    }
-  },
-);
-
-export const getBillSnapshot = createServerFn({ method: "POST" })
-  .inputValidator((data: { billId: string }) => data)
-  .handler(async ({ data }) => {
-    const env = getServerEnv();
-    if (!hasConfiguredConvex(env.convexUrl) || !hasConfiguredConvex(env.convexSiteUrl)) {
-      return null;
-    }
-
-    const auth = getServerAuth();
-    try {
-      return await auth.fetchAuthQuery(api.bills.getBill, {
-        billId: data.billId as Id<"bills">,
-      });
-    } catch {
-      return null;
-    }
-  });

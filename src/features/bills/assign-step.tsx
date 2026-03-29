@@ -9,11 +9,14 @@ import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import type { AssignmentMap } from "../../lib/types";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
+import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
+import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 
 export function AssignStep() {
   const navigate = useNavigate();
   const { draft, patchDraft, hydrated } = useActiveBillDraft();
+  useBillWizardRoutePreload("/bills/new/assign");
 
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [assignmentMap, setAssignmentMap] = useState<AssignmentMap>(
@@ -102,6 +105,7 @@ export function AssignStep() {
     }));
     navigate({
       to: "/bills/new/review",
+      viewTransition: true,
     });
   };
 
@@ -141,7 +145,10 @@ export function AssignStep() {
   return (
     <div className="space-y-6">
       <BillWizardNavBar
-        onBack={() => navigate({ to: "/bills/new/participants" })}
+        currentPath="/bills/new/assign"
+        onBack={() =>
+          navigate({ to: "/bills/new/participants", viewTransition: true })
+        }
         step={4}
         totalSteps={5}
       />
@@ -159,7 +166,7 @@ export function AssignStep() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_22rem]">
+      <section className="grid gap-5 xl:grid-cols-[1fr_18rem]">
         <article className="panel p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--line)] bg-white/55 px-3 py-2">
             <div>
@@ -293,28 +300,46 @@ export function AssignStep() {
           </div>
         </article>
 
-        <aside className="panel p-6">
-          <p className="eyebrow mb-3">Live split</p>
-          <div className="space-y-3">
-            {summary.summaries.map(({ participant, total }) => (
-              <div className="receipt-row" key={participant.id}>
-                <span className="flex items-center gap-3">
-                  <span
-                    className="avatar-badge h-10 w-10 text-xs"
-                    style={{ backgroundColor: participant.color }}
-                  >
-                    {participant.initials}
-                  </span>
-                  <span className="font-semibold text-[var(--ink)]">{participant.name}</span>
-                </span>
-                <span className="font-semibold text-[var(--ink)]">
-                  ${total.toFixed(2)}
-                </span>
-              </div>
-            ))}
+        <aside className="panel space-y-3 p-4 sm:p-5 xl:sticky xl:top-6">
+          <p className="eyebrow text-[0.65rem]">Live split</p>
+          <div className="space-y-2.5">
+            {summary.summaries.map(({ participant, total, items }) => {
+              const itemLabel =
+                items.length === 0
+                  ? "No items yet"
+                  : items.map(({ item }) => item.name).join(", ");
+              return (
+                <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)]/80 px-2.5 py-2" key={participant.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="avatar-badge h-8 w-8 shrink-0 text-[0.65rem]"
+                        style={{ backgroundColor: participant.color }}
+                      >
+                        {participant.initials}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="truncate text-sm font-semibold text-[var(--ink)]">
+                            {participant.name}
+                          </span>
+                          <ParticipantPaidBadge isSelf={participant.isSelf} size="compact" />
+                        </span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">
+                      ${total.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 line-clamp-2 pl-10 text-[0.7rem] leading-snug text-[var(--muted)]">
+                    {itemLabel}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
-          <p className="mt-4 text-xs text-[var(--muted)]">
+          <p className="text-xs text-[var(--muted)]">
             {saveStatus === "saving"
               ? "Saving item picks…"
               : saveStatus === "saved"
@@ -334,7 +359,7 @@ export function AssignStep() {
             Save draft now
           </button>
           <button
-            className="primary-button mt-4 w-full justify-center"
+            className="primary-button mt-2 w-full justify-center py-2.5 text-sm"
             disabled={!summary.isFullyAssigned}
             onClick={() => void goToReview()}
             type="button"

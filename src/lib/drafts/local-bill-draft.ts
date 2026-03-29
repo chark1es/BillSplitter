@@ -1,4 +1,4 @@
-import type { TaxTipMode, AssignmentMap, FxSnapshot } from "../types";
+import type { TaxTipMode, AssignmentMap, FxSnapshot, BillId } from "../types";
 
 export type LocalReceiptPage = {
   id: string;
@@ -40,6 +40,7 @@ export type LocalParticipant = {
 
 export type LocalBillDraft = {
   id: string;
+  linkedBillId?: BillId;
   createdAt: number;
   updatedAt: number;
 
@@ -60,6 +61,7 @@ export const createEmptyLocalBillDraft = (): LocalBillDraft => {
   const id = crypto.randomUUID();
   return {
     id,
+    linkedBillId: undefined,
     createdAt: now,
     updatedAt: now,
     receipt: {
@@ -75,4 +77,3 @@ export const roundMoney = (value: number) => {
   // Keep stable 2-decimal UX; avoid floating drift.
   return Math.round(value * 100) / 100;
 };
-

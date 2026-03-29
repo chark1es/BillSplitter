@@ -7,6 +7,10 @@ import {
   convertForeignToUsd,
   convertUsdToForeign,
 } from "../../lib/fx/usd-fx";
+import {
+  calculateParsedReceiptGrandTotalForeign,
+  calculateParsedReceiptGrandTotalUsd,
+} from "../../lib/receipt/receipt-totals";
 import { getFxSnapshot } from "../../lib/fx/get-fx-snapshot.fn";
 
 type ExchangeRateCardProps = {
@@ -46,17 +50,11 @@ export function ExchangeRateCard({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const receiptTotalForeign = useMemo(
-    () =>
-      parsedReceipt.items.reduce((sum, item) => sum + item.foreignPrice, 0) +
-      parsedReceipt.taxForeignAmount +
-      parsedReceipt.tipForeignAmount,
+    () => calculateParsedReceiptGrandTotalForeign(parsedReceipt),
     [parsedReceipt],
   );
   const receiptTotalUsd = useMemo(
-    () =>
-      parsedReceipt.items.reduce((sum, item) => sum + item.usdPrice, 0) +
-      parsedReceipt.taxUsdAmount +
-      parsedReceipt.tipUsdAmount,
+    () => calculateParsedReceiptGrandTotalUsd(parsedReceipt),
     [parsedReceipt],
   );
 
@@ -178,8 +176,7 @@ export function ExchangeRateCard({
               inputMode="decimal"
               onChange={(event) => handleForeignAmountChange(event.target.value)}
               placeholder={`0.00 ${parsedReceipt.currencyCode}`}
-              step="0.01"
-              type="number"
+              type="text"
               value={foreignAmount}
             />
           </label>
@@ -191,8 +188,7 @@ export function ExchangeRateCard({
               inputMode="decimal"
               onChange={(event) => handleUsdAmountChange(event.target.value)}
               placeholder="0.00 USD"
-              step="0.01"
-              type="number"
+              type="text"
               value={usdAmount}
             />
           </label>

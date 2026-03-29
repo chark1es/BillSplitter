@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBillSummary,
+  buildCompactItemList,
+  buildShareSummaryText,
   createAssignmentMap,
   hydrateBillWithAssignments,
 } from "./bill-calculations";
@@ -12,6 +14,18 @@ const bill = {
   status: "draft",
   imageNames: [],
   receiptImageUrls: [],
+  receiptMetadata: {
+    currencyCode: "JPY",
+    fxSnapshot: {
+      baseCurrency: "USD",
+      currencyCode: "JPY",
+      date: "2026-03-29",
+      foreignUnitsPerUsd: 150,
+      rateSource: "parity",
+    },
+    taxForeignAmount: 300,
+    tipForeignAmount: 0,
+  },
   createdAt: 0,
   updatedAt: 0,
   grandTotal: 20,
@@ -58,5 +72,18 @@ describe("bill calculations", () => {
     const summary = buildBillSummary(workingBill);
     expect(summary.summaries[0]?.total).toBe(12);
     expect(summary.summaries[1]?.total).toBe(8);
+  });
+
+  it("builds compact item lists", () => {
+    const summary = buildBillSummary(bill);
+    const compact = buildCompactItemList(summary.summaries[0]?.items ?? [], 1);
+
+    expect(compact.visibleNames).toEqual(["Shared fries"]);
+    expect(compact.hiddenCount).toBe(1);
+  });
+
+  it("builds share-ready summary text", () => {
+    expect(buildShareSummaryText(bill)).toContain("Dinner: $20.00");
+    expect(buildShareSummaryText(bill)).toContain("You: $14.00");
   });
 });

@@ -2,6 +2,9 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "../../convex/_generated/api";
 import type { BillId } from "./types";
 
+/** React Query cache key for `getViewerSession` (root `beforeLoad`). */
+export const viewerSessionQueryKey = ["viewerSession"] as const;
+
 export const fairShareQueries = {
   auth: {
     viewer: () => ({

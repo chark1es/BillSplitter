@@ -5,6 +5,18 @@ import {
   createEmptyLocalBillDraft,
 } from "./local-bill-draft";
 
+const writeDraftToStorage = (draft: LocalBillDraft | null) => {
+  try {
+    if (!draft) {
+      window.localStorage.removeItem(LOCAL_BILL_DRAFT_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(LOCAL_BILL_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore write failures (private mode / quota exceeded).
+  }
+};
+
 export function useActiveBillDraft() {
   const [draft, setDraft] = useState<LocalBillDraft | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -27,48 +39,34 @@ export function useActiveBillDraft() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!draft) return;
-    const handle = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(
-          LOCAL_BILL_DRAFT_STORAGE_KEY,
-          JSON.stringify(draft),
-        );
-      } catch {
-        // Ignore write failures (private mode / quota exceeded).
-      }
-    }, 250);
-    return () => window.clearTimeout(handle);
-  }, [draft]);
-
   const ensureDraft = useCallback(() => {
-    setDraft((prev) => prev ?? createEmptyLocalBillDraft());
+    setDraft((prev) => {
+      const next = prev ?? createEmptyLocalBillDraft();
+      writeDraftToStorage(next);
+      return next;
+    });
   }, []);
 
   const patchDraft = useCallback(
     (updater: (prev: LocalBillDraft) => LocalBillDraft) => {
       setDraft((prev) => {
-        if (!prev) {
-          return updater(createEmptyLocalBillDraft());
-        }
-        const next = updater(prev);
-        return { ...next, updatedAt: Date.now() };
+        const base = prev ?? createEmptyLocalBillDraft();
+        const next = { ...updater(base), updatedAt: Date.now() };
+        writeDraftToStorage(next);
+        return next;
       });
     },
     [],
   );
 
   const replaceDraft = useCallback((next: LocalBillDraft) => {
-    setDraft({ ...next, updatedAt: Date.now() });
+    const synced = { ...next, updatedAt: Date.now() };
+    writeDraftToStorage(synced);
+    setDraft(synced);
   }, []);
 
   const clearDraft = useCallback(() => {
-    try {
-      window.localStorage.removeItem(LOCAL_BILL_DRAFT_STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+    writeDraftToStorage(null);
     setDraft(null);
   }, []);
 
@@ -81,4 +79,3 @@ export function useActiveBillDraft() {
 
   return { draft, patchDraft, replaceDraft, clearDraft, ensureDraft, hydrated, debug };
 }
-
