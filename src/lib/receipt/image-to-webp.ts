@@ -1,9 +1,29 @@
 const MAX_BYTES = 100 * 1024;
 const MAX_DIM = 1600;
 
-async function bitmapToWebpUnder100k(source: ImageBitmap): Promise<Blob> {
+export type ReceiptUploadAsset = {
+  blob: Blob;
+  fileName: string;
+  mimeType: string;
+  compressed: boolean;
+};
+
+async function bitmapToWebpUnder100k(
+  source: ImageBitmap,
+  options?: {
+    maxDim?: number;
+    initialQuality?: number;
+    minQuality?: number;
+    shrinkStep?: number;
+    qualityStep?: number;
+  },
+): Promise<Blob> {
   const canvas = document.createElement("canvas");
-  let scale = Math.min(1, MAX_DIM / Math.max(source.width, source.height));
+  const maxDim = options?.maxDim ?? MAX_DIM;
+  const minQuality = options?.minQuality ?? 0.42;
+  const qualityStep = options?.qualityStep ?? 0.05;
+  const shrinkStep = options?.shrinkStep ?? 0.88;
+  let scale = Math.min(1, maxDim / Math.max(source.width, source.height));
   let w = Math.max(1, Math.round(source.width * scale));
   let h = Math.max(1, Math.round(source.height * scale));
   canvas.width = w;
@@ -19,7 +39,7 @@ async function bitmapToWebpUnder100k(source: ImageBitmap): Promise<Blob> {
   };
   draw();
 
-  let quality = 0.9;
+  let quality = options?.initialQuality ?? 0.9;
   for (let attempt = 0; attempt < 40; attempt++) {
     const blob: Blob | null = await new Promise((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/webp", quality),
@@ -27,11 +47,11 @@ async function bitmapToWebpUnder100k(source: ImageBitmap): Promise<Blob> {
     if (blob && blob.size <= MAX_BYTES) {
       return blob;
     }
-    quality -= 0.05;
-    if (quality < 0.42) {
+    quality -= qualityStep;
+    if (quality < minQuality) {
       quality = 0.88;
-      w = Math.max(1, Math.round(w * 0.88));
-      h = Math.max(1, Math.round(h * 0.88));
+      w = Math.max(1, Math.round(w * shrinkStep));
+      h = Math.max(1, Math.round(h * shrinkStep));
       canvas.width = w;
       canvas.height = h;
       draw();
@@ -81,7 +101,7 @@ async function pdfFirstPageToBitmap(file: File): Promise<ImageBitmap> {
 const IMAGE_TYPES =
   /^image\/(png|jpeg|jpg|webp|gif|bmp|tiff|avif|svg\+xml|heic|heif)/i;
 
-export async function convertReceiptFileToWebp(file: File): Promise<Blob> {
+export async function convertReceiptFileToWebp(file: File): Promise<ReceiptUploadAsset> {
   const name = file.name.toLowerCase();
   const mime = (file.type || "").toLowerCase();
   let bitmap: ImageBitmap | null = null;
@@ -101,7 +121,40 @@ export async function convertReceiptFileToWebp(file: File): Promise<Blob> {
     } else {
       bitmap = await createImageBitmap(file);
     }
-    return await bitmapToWebpUnder100k(bitmap);
+    try {
+      const firstPass = await bitmapToWebpUnder100k(bitmap);
+      return {
+        blob: firstPass,
+        fileName: `${file.name.replace(/\.[^.]+$/, "")}.webp`,
+        mimeType: "image/webp",
+        compressed: true,
+      };
+    } catch {
+      // Second pass: smaller max dimension and slightly more aggressive quality decay.
+      const secondPass = await bitmapToWebpUnder100k(bitmap, {
+        maxDim: 1280,
+        initialQuality: 0.86,
+        minQuality: 0.35,
+        shrinkStep: 0.84,
+        qualityStep: 0.06,
+      }).catch(() => null);
+
+      if (secondPass && secondPass.size <= MAX_BYTES) {
+        return {
+          blob: secondPass,
+          fileName: `${file.name.replace(/\.[^.]+$/, "")}.webp`,
+          mimeType: "image/webp",
+          compressed: true,
+        };
+      }
+
+      return {
+        blob: file,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        compressed: false,
+      };
+    }
   } finally {
     bitmap?.close();
   }

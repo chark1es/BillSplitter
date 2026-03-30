@@ -156,13 +156,11 @@ export function UploadStep() {
       ]);
 
       try {
-        const webpBlob = await convertReceiptFileToWebp(file);
-        const previewUrl = URL.createObjectURL(webpBlob);
-        const webpFile = new File(
-          [webpBlob],
-          `${file.name.replace(/\.[^.]+$/, "")}.webp`,
-          { type: "image/webp" },
-        );
+        const processedFile = await convertReceiptFileToWebp(file);
+        const previewUrl = URL.createObjectURL(processedFile.blob);
+        const uploadFile = new File([processedFile.blob], processedFile.fileName, {
+          type: processedFile.mimeType,
+        });
 
         setUploadRows((prev) =>
           prev.map((row) =>
@@ -172,7 +170,7 @@ export function UploadStep() {
           ),
         );
 
-        const uploaded = await startUpload([webpFile]);
+        const uploaded = await startUpload([uploadFile]);
         const first = uploaded?.[0];
         const ufsUrl =
           first &&
@@ -505,7 +503,7 @@ export function UploadStep() {
                   </li>
                 </ul>
                 <p className="mt-3 text-xs leading-relaxed text-[var(--muted)]/90">
-                  Each file is converted to WebP (&lt;100KB) before upload.{" "}
+                  Each file is compressed toward WebP (&lt;100KB); if that fails, the original file is uploaded.{" "}
                   <span className="font-medium text-[var(--muted)]">
                     {uploadMode === "replace"
                       ? "Existing pages are cleared when upload starts."
