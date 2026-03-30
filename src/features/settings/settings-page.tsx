@@ -1,11 +1,46 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { authClient } from "../../lib/auth/auth-client";
+import { useState } from "react";
 
 const rootRoute = getRouteApi("__root__");
 
 export function SettingsPage() {
   const { auth } = rootRoute.useRouteContext();
   const user = auth.user;
+  const [isUpdatingPwa, setIsUpdatingPwa] = useState(false);
+
+  const forceUpdatePwa = async () => {
+    setIsUpdatingPwa(true);
+    try {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      // Ask active registration to fetch newest service worker script.
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations.map(async (registration) => {
+            await registration.update().catch(() => null);
+            registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+          }),
+        );
+      }
+
+      // Drop runtime caches so stale asset responses cannot linger after reload.
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+
+      // Bust browser cache and fully reload app shell.
+      const url = new URL(window.location.href);
+      url.searchParams.set("refresh", Date.now().toString());
+      window.location.replace(url.toString());
+    } finally {
+      setIsUpdatingPwa(false);
+    }
+  };
 
   if (!user) {
     return null;
@@ -55,6 +90,14 @@ export function SettingsPage() {
           <Link className="secondary-button no-underline" to="/dashboard">
             Back to dashboard
           </Link>
+          <button
+            className="secondary-button"
+            disabled={isUpdatingPwa}
+            onClick={() => void forceUpdatePwa()}
+            type="button"
+          >
+            {isUpdatingPwa ? "Forcing update..." : "Force app update (PWA)"}
+          </button>
         </div>
       </section>
     </div>

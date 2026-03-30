@@ -7,7 +7,8 @@ const f = createUploadthing();
 
 export const uploadRouter = {
   receiptImage: f({
-    image: { maxFileSize: "2MB", maxFileCount: 6 },
+    image: { maxFileSize: "8MB", maxFileCount: 6 },
+    pdf: { maxFileSize: "6MB", maxFileCount: 6 },
   })
     .middleware(async () => {
       const env = getServerEnv();

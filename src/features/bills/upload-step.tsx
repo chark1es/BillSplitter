@@ -87,15 +87,15 @@ export function UploadStep() {
         : 0;
   const adjustedGrandTotalForeign = parsedReceipt
     ? calculateParsedReceiptGrandTotalForeign({
-        ...parsedReceipt,
-        discountForeignAmount,
-      })
+      ...parsedReceipt,
+      discountForeignAmount,
+    })
     : 0;
   const adjustedGrandTotalUsd = parsedReceipt
     ? calculateParsedReceiptGrandTotalUsd({
-        ...parsedReceipt,
-        discountUsdAmount,
-      })
+      ...parsedReceipt,
+      discountUsdAmount,
+    })
     : 0;
 
   const canProceed = Boolean(parsedReceipt) && !isParsing;
@@ -119,112 +119,118 @@ export function UploadStep() {
 
   const replaceOrAddPagesWithFiles = useCallback(
     async (fileList: FileList | File[] | null, mode: "add" | "replace") => {
-    const files = Array.from(fileList ?? []);
-    if (files.length === 0) {
-      return;
-    }
+      const files = Array.from(fileList ?? []);
+      if (files.length === 0) {
+        return;
+      }
 
-    setParseError(null);
+      setParseError(null);
 
-    patchDraft((prev) => {
-      const pages = mode === "replace" ? [] : prev.receipt.pages;
-      return {
-        ...prev,
-        receipt: {
-          ...prev.receipt,
-          pages,
-          parsed: null,
-        },
-        assignments: {},
-      };
-    });
-
-    // Upload sequentially to keep the UI stable.
-    for (const file of files) {
-      const rowId = crypto.randomUUID();
-      const label = file.name;
-
-      setUploadRows((prev) => [
-        ...prev,
-        {
-          id: rowId,
-          previewUrl: "",
-          ufsUrl: null,
-          label,
-          status: "converting",
-        },
-      ]);
-
-      try {
-        const processedFile = await convertReceiptFileToWebp(file);
-        const previewUrl = URL.createObjectURL(processedFile.blob);
-        const uploadFile = new File([processedFile.blob], processedFile.fileName, {
-          type: processedFile.mimeType,
-        });
-
-        setUploadRows((prev) =>
-          prev.map((row) =>
-            row.id === rowId
-              ? { ...row, previewUrl, status: "uploading" as const }
-              : row,
-          ),
-        );
-
-        const uploaded = await startUpload([uploadFile]);
-        const first = uploaded?.[0];
-        const ufsUrl =
-          first &&
-          typeof first === "object" &&
-          "ufsUrl" in first &&
-          typeof (first as { ufsUrl?: string }).ufsUrl === "string"
-            ? (first as { ufsUrl: string }).ufsUrl
-            : first &&
-                typeof first === "object" &&
-                "url" in first &&
-                typeof (first as { url?: string }).url === "string"
-              ? (first as { url: string }).url
-              : null;
-
-        if (!ufsUrl) {
-          throw new Error("Upload did not return a URL");
-        }
-
-        // Persist as part of the local draft receipt.
-        patchDraft((prev) => ({
+      patchDraft((prev) => {
+        const pages = mode === "replace" ? [] : prev.receipt.pages;
+        return {
           ...prev,
           receipt: {
             ...prev.receipt,
-            pages: [
-              ...prev.receipt.pages,
-              {
-                id: rowId,
-                label,
-                ufsUrl,
-              },
-            ],
+            pages,
             parsed: null,
           },
           assignments: {},
-        }));
+        };
+      });
 
-        setUploadRows((prev) => {
-          const row = prev.find((r) => r.id === rowId);
-          if (row?.previewUrl.startsWith("blob:")) {
-            URL.revokeObjectURL(row.previewUrl);
+      // Upload sequentially to keep the UI stable.
+      for (const file of files) {
+        const rowId = crypto.randomUUID();
+        const label = file.name;
+
+        setUploadRows((prev) => [
+          ...prev,
+          {
+            id: rowId,
+            previewUrl: "",
+            ufsUrl: null,
+            label,
+            status: "converting",
+          },
+        ]);
+
+        try {
+          const processedFile = await convertReceiptFileToWebp(file);
+          const previewUrl = URL.createObjectURL(processedFile.blob);
+          const uploadFile = new File([processedFile.blob], processedFile.fileName, {
+            type: processedFile.mimeType,
+          });
+
+          setUploadRows((prev) =>
+            prev.map((row) =>
+              row.id === rowId
+                ? { ...row, previewUrl, status: "uploading" as const }
+                : row,
+            ),
+          );
+
+        const uploaded = await startUpload([uploadFile]);
+        const first = uploaded?.[0] as
+          | {
+              ufsUrl?: string;
+              url?: string;
+              appUrl?: string;
+              serverData?: { ufsUrl?: string; url?: string };
+              data?: { ufsUrl?: string; url?: string };
+            }
+          | undefined;
+        const ufsUrl =
+          first?.ufsUrl ??
+          first?.url ??
+          first?.appUrl ??
+          first?.serverData?.ufsUrl ??
+          first?.serverData?.url ??
+          first?.data?.ufsUrl ??
+          first?.data?.url ??
+          null;
+
+          if (!ufsUrl) {
+          const details = JSON.stringify(first ?? null);
+          throw new Error(`Upload did not return a URL: ${details}`);
           }
-          return prev.filter((r) => r.id !== rowId);
-        });
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Upload failed";
-        setUploadRows((prev) =>
-          prev.map((row) =>
-            row.id === rowId
-              ? { ...row, status: "error" as const, error: message }
-              : row,
-          ),
-        );
+
+          // Persist as part of the local draft receipt.
+          patchDraft((prev) => ({
+            ...prev,
+            receipt: {
+              ...prev.receipt,
+              pages: [
+                ...prev.receipt.pages,
+                {
+                  id: rowId,
+                  label,
+                  ufsUrl,
+                },
+              ],
+              parsed: null,
+            },
+            assignments: {},
+          }));
+
+          setUploadRows((prev) => {
+            const row = prev.find((r) => r.id === rowId);
+            if (row?.previewUrl.startsWith("blob:")) {
+              URL.revokeObjectURL(row.previewUrl);
+            }
+            return prev.filter((r) => r.id !== rowId);
+          });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "Upload failed";
+          setUploadRows((prev) =>
+            prev.map((row) =>
+              row.id === rowId
+                ? { ...row, status: "error" as const, error: message }
+                : row,
+            ),
+          );
+        }
       }
-    }
     },
     [patchDraft, startUpload],
   );
