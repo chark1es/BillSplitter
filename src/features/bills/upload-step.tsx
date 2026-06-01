@@ -20,8 +20,7 @@ import {
 import { useUploadThing } from "../../lib/uploadthing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
-import { BillWizardHero } from "./bill-wizard-hero";
-import { BillWizardNavBar } from "./bill-wizard-nav";
+import { BillWizardShell } from "./bill-wizard-shell";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 import { cn } from "../../lib/utils";
@@ -387,23 +386,18 @@ export function UploadStep() {
   const isUploadActive = isUploading || uploadRows.length > 0;
 
   return (
-    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
-      <BillWizardNavBar
+    <div className="space-y-4">
+      <BillWizardShell
         currentPath="/bills/new/upload"
+        description="Drop, paste, or pick files. Parse when all pages are uploaded."
         onBack={() => navigate({ to: "/dashboard", viewTransition: true })}
         step={1}
-        totalSteps={5}
-      />
-      <BillWizardHero
-        description="Drop, paste, or browse. Images are compressed to WebP before upload; tap parse when your pages are ready."
-        eyebrow="Receipt"
-        step={1}
-        title="Upload the receipt."
+        title="Upload receipt"
         trailing={<LocalDraftDisclosure />}
       />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start lg:gap-6">
-        <article className="panel min-w-0 p-5 sm:p-7">
+      <section className="grid gap-4 lg:grid-cols-[1fr_16rem] lg:items-start">
+        <article className="panel min-w-0 p-4 sm:p-5">
           <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="font-semibold text-lg text-[var(--ink)]">Receipt pages</h2>
@@ -490,12 +484,12 @@ export function UploadStep() {
                 </div>
               ) : null}
               <div className="min-w-0 flex-1 text-left">
-                <span className="eyebrow">
-                  {uploadMode === "replace" ? "Replace with new files" : "Add receipt pages"}
-                </span>
-                <span className="display mt-2 block text-2xl text-[var(--ink)] sm:text-3xl">
-                  {isDragging ? "Drop to upload" : "PDF, HEIC, PNG, JPEG…"}
-                </span>
+                <p className="section-label">
+                  {uploadMode === "replace" ? "Replace files" : "Add pages"}
+                </p>
+                <p className="mt-1 text-base font-semibold text-[var(--ink)]">
+                  {isDragging ? "Drop to upload" : "PDF, HEIC, PNG, or JPEG"}
+                </p>
                 <ul className="mt-3 flex flex-col gap-2 text-sm text-[var(--muted)] sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1">
                   <li className="flex items-center gap-2">
                     <Upload aria-hidden className="size-4 shrink-0 opacity-70" />
@@ -631,7 +625,7 @@ export function UploadStep() {
             <div className="mt-6 border-t border-[var(--line)] pt-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="eyebrow text-[0.65rem]">Parsed</p>
+                  <p className="section-label">Parsed</p>
                   <p className="mt-0.5 text-xs text-[var(--muted)]">
                     Totals from the receipt — refine line items on the next step.
                   </p>
@@ -757,7 +751,7 @@ export function UploadStep() {
         </article>
 
         <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
-          <p className="eyebrow mb-3 text-[0.65rem]">What&apos;s next</p>
+          <p className="section-label mb-2">Next</p>
           <ol className="space-y-3.5 text-sm leading-relaxed text-[var(--muted)]">
             <li className="flex gap-3">
               <span className="shrink-0 font-semibold tabular-nums text-[var(--accent)]">

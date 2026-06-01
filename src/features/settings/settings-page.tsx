@@ -1,6 +1,7 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { authClient } from "../../lib/auth/auth-client";
 import { useState } from "react";
+import { PageHeader } from "../../components/layout/page-header";
 
 const rootRoute = getRouteApi("__root__");
 
@@ -16,7 +17,6 @@ export function SettingsPage() {
         return;
       }
 
-      // Ask active registration to fetch newest service worker script.
       if ("serviceWorker" in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(
@@ -27,13 +27,11 @@ export function SettingsPage() {
         );
       }
 
-      // Drop runtime caches so stale asset responses cannot linger after reload.
       if ("caches" in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map((key) => caches.delete(key)));
       }
 
-      // Bust browser cache and fully reload app shell.
       const url = new URL(window.location.href);
       url.searchParams.set("refresh", Date.now().toString());
       window.location.replace(url.toString());
@@ -47,17 +45,11 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8">
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Account</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl">Settings</h1>
-        <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-          Profile and session for this device.
-        </p>
-      </section>
+    <div className="mx-auto w-full max-w-lg space-y-5">
+      <PageHeader title="Settings" description="Profile and app preferences." />
 
-      <section className="panel p-6 sm:p-8">
-        <p className="eyebrow mb-3">
+      <section className="panel p-4 sm:p-5">
+        <p className="section-label mb-3">
           {auth.isBypassMode ? "Testing bypass" : "Signed in"}
         </p>
         <div className="flex items-center gap-3">
@@ -69,34 +61,36 @@ export function SettingsPage() {
               .slice(0, 2)
               .toUpperCase()}
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-[var(--ink)]">{user.name}</p>
-            <p className="text-sm text-[var(--muted)]">{user.email}</p>
+            <p className="truncate text-sm text-[var(--muted)]">{user.email}</p>
           </div>
         </div>
+
         {auth.isBypassMode ? (
-          <div className="mt-4 rounded-[1.2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Auth is being bypassed through <code>TEST_AUTH_BYPASS=true</code>.
-          </div>
+          <p className="mt-4 rounded-[var(--radius-control)] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Auth bypassed via <code>TEST_AUTH_BYPASS=true</code>.
+          </p>
         ) : null}
-        <div className="mt-6 flex flex-wrap gap-3">
+
+        <div className="mt-5 flex flex-wrap gap-2">
           <button
             className="secondary-button"
             onClick={() => authClient.signOut()}
             type="button"
           >
-            Sign out everywhere on this browser
+            Sign out
           </button>
           <Link className="secondary-button no-underline" to="/dashboard">
-            Back to dashboard
+            Back to bills
           </Link>
           <button
-            className="secondary-button"
+            className="ghost-button"
             disabled={isUpdatingPwa}
             onClick={() => void forceUpdatePwa()}
             type="button"
           >
-            {isUpdatingPwa ? "Forcing update..." : "Force app update (PWA)"}
+            {isUpdatingPwa ? "Updating…" : "Refresh app (PWA)"}
           </button>
         </div>
       </section>

@@ -82,7 +82,7 @@ export function ReceiptPreviewRail({
       <aside className={panelClass}>
         <div className={`flex items-start justify-between gap-2 ${compact ? "gap-3" : ""}`}>
           <div className="min-w-0">
-            <p className={`eyebrow ${compact ? "mb-0.5 text-[0.6rem]" : "mb-2"}`}>Receipt</p>
+            <p className={`section-label ${compact ? "mb-0.5" : "mb-1"}`}>Receipt</p>
             <p
               className={`font-semibold text-[var(--ink)] ${compact ? "truncate text-xs leading-snug sm:text-sm" : ""}`}
             >

@@ -28,8 +28,7 @@ import { AssignQtyDialog } from "./assign-qty-dialog";
 import { AssignSplitDialog } from "./assign-split-dialog";
 import type { SharedUnitSplitsMap } from "../../lib/types";
 import { ParticipantRoleBadges } from "./participant-role-badges";
-import { BillWizardHero } from "./bill-wizard-hero";
-import { BillWizardNavBar } from "./bill-wizard-nav";
+import { BillWizardShell } from "./bill-wizard-shell";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
@@ -318,24 +317,19 @@ export function AssignStep() {
     : null;
 
   return (
-    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
-      <BillWizardNavBar
+    <div className="space-y-4">
+      <BillWizardShell
         currentPath="/bills/new/assign"
+        description="Tap each item to assign people. Progress shows when you're done."
         onBack={() =>
           navigate({ to: "/bills/new/participants", viewTransition: true })
         }
         step={4}
-        totalSteps={5}
-      />
-      <BillWizardHero
-        description="Expand a line to toggle people. Collapsed rows show who’s on each item at a glance."
-        eyebrow="Assign"
-        step={4}
-        title="Assign every item."
+        title="Assign items"
         trailing={<LocalDraftDisclosure />}
       />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start lg:gap-6 xl:grid-cols-[1fr_19rem]">
+      <section className="grid gap-4 lg:grid-cols-[1fr_16rem] lg:items-start">
         <article className="panel p-4 sm:p-5 md:p-6">
           <div className="mb-3 flex items-center justify-between rounded-xl border border-[var(--line)] bg-white/55 px-3 py-2">
             <div>
@@ -540,7 +534,7 @@ export function AssignStep() {
         <aside className="panel space-y-3 p-4 sm:space-y-4 sm:p-5 lg:sticky lg:top-5 xl:p-6">
           <div>
             <div className="mb-2 flex items-end justify-between gap-3">
-              <p className="eyebrow text-[0.62rem] leading-none">Live split</p>
+              <p className="section-label leading-none">Progress</p>
               <span className="text-[0.65rem] font-semibold tabular-nums text-[var(--muted)]">
                 ${summary.grandTotal.toFixed(2)}
                 <span className="ml-1 font-normal opacity-80">total</span>
@@ -732,7 +726,7 @@ function SplitDetailModalBody({
             {participant.initials}
           </span>
           <div className="min-w-0 flex-1">
-            <DialogTitle className="display text-left text-xl text-[var(--ink)] sm:text-2xl">
+            <DialogTitle className="page-title text-left text-lg">
               {participant.name}
             </DialogTitle>
             <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -744,7 +738,7 @@ function SplitDetailModalBody({
             <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
               Owes
             </span>
-            <span className="display block text-2xl leading-none text-[var(--ink)]">
+            <span className="block text-xl font-bold tabular-nums leading-none text-[var(--ink)]">
               ${total.toFixed(2)}
             </span>
           </p>

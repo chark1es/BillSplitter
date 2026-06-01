@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useConvexMutation } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
+import { PageHeader } from "../../components/layout/page-header";
 import { fairShareQueries } from "../../lib/queries";
 
 export function AdminInvitesPage() {
@@ -19,19 +20,16 @@ export function AdminInvitesPage() {
   const [email, setEmail] = useState("");
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8">
-      <section className="hero-panel px-7 py-8 sm:px-10 sm:py-10">
-        <p className="eyebrow mb-3">Admin</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl">Invites</h1>
-        <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-          Add emails allowed to sign in. They receive an invitation email with a link
-          to the app.
-        </p>
-      </section>
+    <div className="mx-auto w-full max-w-2xl space-y-5">
+      <PageHeader
+        label="Admin"
+        title="Invites"
+        description="Allow emails to sign in. They receive an invite link by email."
+      />
 
-      <section className="panel p-6 sm:p-8">
+      <section className="panel p-4 sm:p-5">
         <form
-          className="flex flex-col gap-4 sm:flex-row sm:items-end"
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
           onSubmit={(e) => {
             e.preventDefault();
             if (!email.trim()) {
@@ -45,10 +43,10 @@ export function AdminInvitesPage() {
             );
           }}
         >
-          <label className="grid flex-1 gap-1 text-sm">
-            <span className="font-semibold text-[var(--ink)]">Email</span>
+          <label className="grid min-w-0 flex-1 gap-1 text-sm">
+            <span className="font-medium text-[var(--ink)]">Email</span>
             <input
-              className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-[var(--ink)]"
+              className="input-field"
               onChange={(e) => setEmail(e.target.value)}
               placeholder="friend@example.com"
               type="email"
@@ -56,7 +54,7 @@ export function AdminInvitesPage() {
             />
           </label>
           <button
-            className="primary-button justify-center sm:w-40"
+            className="primary-button sm:w-28"
             disabled={inviteMutation.isPending}
             type="submit"
           >
@@ -64,25 +62,25 @@ export function AdminInvitesPage() {
           </button>
         </form>
 
-        <div className="mt-8 overflow-x-auto rounded-2xl border border-[var(--line)]">
+        <div className="mt-5 overflow-x-auto rounded-[var(--radius-control)] border border-[var(--line)]">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--surface-2)]">
               <tr className="border-b border-[var(--line)]">
-                <th className="px-4 py-3 font-semibold text-[var(--muted)]">Email</th>
-                <th className="px-4 py-3 font-semibold text-[var(--muted)]">Invited</th>
-                <th className="px-4 py-3" />
+                <th className="px-3 py-2 font-medium text-[var(--muted)]">Email</th>
+                <th className="px-3 py-2 font-medium text-[var(--muted)]">Invited</th>
+                <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
               {(listQuery.data ?? []).map((row) => (
                 <tr className="border-b border-[var(--line)] last:border-0" key={row.id}>
-                  <td className="px-4 py-3 font-medium text-[var(--ink)]">{row.email}</td>
-                  <td className="px-4 py-3 text-[var(--muted)]">
+                  <td className="px-3 py-2 font-medium text-[var(--ink)]">{row.email}</td>
+                  <td className="px-3 py-2 text-[var(--muted)]">
                     {new Date(row.invitedAt).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-2 text-right">
                     <button
-                      className="text-sm font-semibold text-rose-700"
+                      className="ghost-button text-rose-700"
                       disabled={removeMutation.isPending}
                       onClick={() => removeMutation.mutate({ email: row.email })}
                       type="button"
@@ -95,13 +93,13 @@ export function AdminInvitesPage() {
             </tbody>
           </table>
           {listQuery.data?.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">
+            <p className="px-3 py-5 text-center text-sm text-[var(--muted)]">
               No invited emails yet.
             </p>
           ) : null}
         </div>
 
-        <Link className="mt-6 inline-block text-sm font-semibold text-[var(--accent)]" to="/settings">
+        <Link className="mt-4 inline-block text-sm font-semibold text-[var(--accent)]" to="/settings">
           ← Settings
         </Link>
       </section>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { BillWizardHero } from "./bill-wizard-hero";
-import { BillWizardNavBar } from "./bill-wizard-nav";
+import { BillWizardShell } from "./bill-wizard-shell";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
@@ -291,18 +290,13 @@ export function ItemizedReceiptStep() {
   }
 
   return (
-    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
-      <BillWizardNavBar
+    <div className="space-y-4">
+      <BillWizardShell
         currentPath="/bills/new/itemized"
+        description="Fix line items, tax, tip, and exchange rate before assigning."
         onBack={() => navigate({ to: "/bills/new/upload", viewTransition: true })}
         step={2}
-        totalSteps={5}
-      />
-      <BillWizardHero
-        description="Edit names and prices in the table, or open an item for the full form. Tax, tip, and totals stay in sync with your FX rate."
-        eyebrow="Itemized"
-        step={2}
-        title="Review itemized receipt."
+        title="Review items"
         trailing={<LocalDraftDisclosure />}
       />
 
@@ -317,7 +311,7 @@ export function ItemizedReceiptStep() {
         <article className="panel min-w-0 p-5 sm:p-7">
           <div className="flex flex-col gap-1 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="eyebrow text-[0.65rem]">Line items</p>
+              <p className="section-label">Line items</p>
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Fix names and prices here; tax, tip, and FX live below.
               </p>
@@ -445,7 +439,7 @@ export function ItemizedReceiptStep() {
 
           <section className="mt-6 border-t border-[var(--line)] pt-5">
             <div>
-              <p className="eyebrow text-[0.65rem]">Tax, tip, totals</p>
+              <p className="section-label">Tax, tip & totals</p>
               <p className="mt-1 text-xs text-[var(--muted)]">
                 Values sync across currencies using your FX snapshot.
               </p>
@@ -536,7 +530,7 @@ export function ItemizedReceiptStep() {
             </div>
 
             <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 sm:px-4 sm:py-4">
-              <p className="eyebrow text-[0.65rem]">Updated totals</p>
+              <p className="section-label">Totals</p>
               <div className={`mt-3 grid gap-4 ${isUsd ? "" : "lg:grid-cols-2 lg:gap-6"}`}>
                 {!isUsd ? (
                   <div>
@@ -627,7 +621,7 @@ export function ItemizedReceiptStep() {
         </article>
 
         <aside className="panel p-5 sm:p-6 lg:sticky lg:top-5">
-          <p className="eyebrow mb-3 text-[0.65rem]">Next</p>
+          <p className="section-label mb-2">Next</p>
           <ol className="space-y-2.5 text-sm leading-relaxed text-[var(--muted)]">
             <li className="flex gap-2">
               <span className="font-semibold tabular-nums text-[var(--accent)]">1</span>
@@ -658,7 +652,7 @@ export function ItemizedReceiptStep() {
           {editingItem ? (
             <>
               <DialogHeader>
-                <DialogTitle className="display text-3xl text-[var(--ink)]">
+                <DialogTitle className="page-title text-xl">
                   Edit item
                 </DialogTitle>
                 <DialogDescription className="text-[var(--muted)]">
@@ -778,7 +772,7 @@ export function ItemizedReceiptStep() {
       >
         <DialogContent className="rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface)] p-5 sm:max-w-lg sm:p-6">
           <DialogHeader>
-            <DialogTitle className="display text-3xl text-[var(--ink)]">Add item</DialogTitle>
+            <DialogTitle className="page-title text-xl">Add item</DialogTitle>
             <DialogDescription className="text-[var(--muted)]">
               Add a missing line from the receipt. Price fields auto-sync with your FX rate.
             </DialogDescription>

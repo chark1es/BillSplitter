@@ -13,7 +13,7 @@ import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
 import type { BillDetail, FxSnapshot, TaxTipMode } from "../../lib/types";
 import { BillSummaryScreen } from "./bill-summary-screen";
-import { BillWizardNavBar } from "./bill-wizard-nav";
+import { BillWizardShell } from "./bill-wizard-shell";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 import { useDeferredMoneyField } from "./use-deferred-money-field";
@@ -208,24 +208,32 @@ export function ReviewStep() {
   }
 
   return (
-    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
-      <BillWizardNavBar
+    <div className="space-y-4">
+      <BillWizardShell
         currentPath="/bills/new/review"
+        description={
+          draft.linkedBillId
+            ? "Saved to your account. Edit here or open the share page."
+            : "Check totals, then save to keep this split."
+        }
         onBack={() => navigate({ to: "/bills/new/assign", viewTransition: true })}
         step={5}
-        totalSteps={5}
+        title={
+          draft.linkedBillId ? "Review saved bill" : "Review & save"
+        }
+        trailing={<LocalDraftDisclosure />}
       />
 
       <BillSummaryScreen
         bill={previewBill}
-        wizardStep={5}
+        suppressHeader
         contentTop={
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
                 <span className="font-semibold text-[var(--ink)]">Tax</span>
                 <input
-                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  className="input-field"
                   inputMode="decimal"
                   onBlur={taxField.onBlur}
                   onChange={taxField.onChange}
@@ -236,7 +244,7 @@ export function ReviewStep() {
               <label className="grid gap-1 text-sm">
                 <span className="font-semibold text-[var(--ink)]">Tip</span>
                 <input
-                  className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  className="input-field"
                   inputMode="decimal"
                   onBlur={tipField.onBlur}
                   onChange={tipField.onChange}
@@ -270,22 +278,15 @@ export function ReviewStep() {
             </div>
           </>
         }
-        description={
-          draft.linkedBillId
-            ? "The bill is saved. Keep editing here, copy the summary, or open the canonical share page."
-            : "Adjust tax, tip, and how they allocate across people. Saving stays on this summary so you can keep editing without losing context."
-        }
-        eyebrow={draft.linkedBillId ? "Saved summary" : "Step 5"}
-        headerExtras={<LocalDraftDisclosure />}
         sidePanel={
-          <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
-            <p className="eyebrow mb-2 text-[0.65rem]">
-              {draft.linkedBillId ? "Saved bill" : "Save split"}
+          <aside className="panel flex flex-col p-4 sm:p-5 lg:sticky lg:top-20">
+            <p className="section-label mb-2">
+              {draft.linkedBillId ? "Saved bill" : "Save"}
             </p>
-            <p className="text-sm leading-6 text-[var(--muted)]">
+            <p className="text-sm text-[var(--muted)]">
               {draft.linkedBillId
-                ? "This wizard stays linked to the confirmed bill. Save again to overwrite the same bill id."
-                : "Saving creates a confirmed bill and keeps this draft open so you can still jump back and edit any step."}
+                ? "Save again to update this bill. Share page stays in sync."
+                : "Creates a saved bill you can share and edit later."}
             </p>
 
             {!summary.isFullyAssigned ? (
@@ -333,9 +334,6 @@ export function ReviewStep() {
               </Link>
             ) : null}
           </aside>
-        }
-        title={
-          draft.linkedBillId ? "Bill saved. Keep editing or share it." : "Review before you save."
         }
       />
     </div>

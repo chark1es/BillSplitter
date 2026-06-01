@@ -30,72 +30,65 @@ export function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-[var(--line)] bg-[color:var(--header)]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--header)]">
         <div
-          className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-6 py-4"
+          className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-2.5"
           style={{
-            paddingTop: "max(1rem, env(safe-area-inset-top))",
-            paddingLeft: "max(1.5rem, env(safe-area-inset-left))",
-            paddingRight: "max(1.5rem, env(safe-area-inset-right))",
+            paddingTop: "max(0.625rem, env(safe-area-inset-top))",
+            paddingLeft: "max(1rem, env(safe-area-inset-left))",
+            paddingRight: "max(1rem, env(safe-area-inset-right))",
           }}
         >
-          <Link to="/dashboard" className="brand-lockup no-underline">
-            <span className="brand-mark">FS</span>
-            <span>
-              <span className="block text-[0.7rem] uppercase tracking-[0.32em] text-[var(--muted)]">
-                FairShare
-              </span>
-              <span className="display text-xl text-[var(--ink)]">split smarter</span>
-            </span>
+          <Link
+            to="/dashboard"
+            className="truncate text-sm font-bold tracking-tight text-[var(--ink)] no-underline"
+          >
+            FairShare
           </Link>
 
-          <nav className="ml-auto flex flex-wrap items-center gap-2 text-sm font-semibold">
+          <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">
             <Link
               to="/dashboard"
-              className="nav-pill"
-              activeProps={{ className: "nav-pill is-active" }}
+              className="app-nav-link"
+              activeProps={{ className: "app-nav-link is-active" }}
             >
-              Dashboard
+              Bills
             </Link>
-            <button
-              className="nav-pill"
-              onClick={startNewBill}
-              type="button"
-            >
-              New bill
+            <button className="app-nav-link" onClick={startNewBill} type="button">
+              New
             </button>
             <Link
               to="/settings"
-              className="nav-pill"
-              activeProps={{ className: "nav-pill is-active" }}
+              className="app-nav-link"
+              activeProps={{ className: "app-nav-link is-active" }}
             >
               Settings
             </Link>
             {auth.isAdmin ? (
               <Link
                 to="/admin/invites"
-                className="nav-pill"
-                activeProps={{ className: "nav-pill is-active" }}
+                className="app-nav-link"
+                activeProps={{ className: "app-nav-link is-active" }}
               >
                 Admin
               </Link>
             ) : null}
-            <button className="secondary-button" onClick={handleSignOut} type="button">
-              {auth.isBypassMode ? "Testing mode" : "Sign out"}
+            <button className="ghost-button" onClick={handleSignOut} type="button">
+              {auth.isBypassMode ? "Test mode" : "Sign out"}
             </button>
           </nav>
         </div>
       </header>
 
       <div
-        className="mx-auto flex w-full max-w-7xl flex-col px-6 py-8"
+        className="mx-auto w-full max-w-5xl px-4 py-5"
         style={{
-          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
-          paddingLeft: "max(1.5rem, env(safe-area-inset-left))",
-          paddingRight: "max(1.5rem, env(safe-area-inset-right))",
+          paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
+          paddingLeft: "max(1rem, env(safe-area-inset-left))",
+          paddingRight: "max(1rem, env(safe-area-inset-right))",
         }}
       >
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0">{children}</main>
       </div>
     </div>
   );

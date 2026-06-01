@@ -13,8 +13,7 @@ import { cn } from "#/lib/utils";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import type { ParticipantDraft } from "../../lib/types";
-import { BillWizardHero } from "./bill-wizard-hero";
-import { BillWizardNavBar } from "./bill-wizard-nav";
+import { BillWizardShell } from "./bill-wizard-shell";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 
 const COLOR_PALETTE = [
@@ -299,24 +298,19 @@ export function ParticipantsStep() {
   const canContinue = rows.length >= 2;
 
   return (
-    <div className="space-y-5 px-1 sm:space-y-6 sm:px-0">
-      <BillWizardNavBar
+    <div className="space-y-4">
+      <BillWizardShell
         currentPath="/bills/new/participants"
+        description="Add everyone at the table. Mark who paid or whose birthday is covered."
         onBack={() =>
           navigate({ to: "/bills/new/itemized", viewTransition: true })
         }
         step={3}
-        totalSteps={5}
-      />
-      <BillWizardHero
-        description="Everyone who shared the bill gets a color for the assign step. Mark who paid so balances read clearly."
-        eyebrow="People"
-        step={3}
-        title="Who split the table?"
+        title="Who's splitting?"
         trailing={<LocalDraftDisclosure />}
       />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_17rem] lg:items-start lg:gap-6">
+      <section className="grid gap-4 lg:grid-cols-[1fr_15rem] lg:items-start">
         <article className="panel min-w-0 overflow-hidden p-0">
           <div className="border-b border-[var(--line)] bg-[var(--surface-2)]/90 px-5 py-5 sm:px-7 sm:py-6">
             <div className="flex flex-wrap items-center gap-2">
@@ -343,7 +337,7 @@ export function ParticipantsStep() {
                   Display name
                 </span>
                 <input
-                  className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-[var(--ink)] shadow-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]"
+                  className="input-field"
                   onChange={(e) => setDraftName(e.target.value)}
                   placeholder="e.g. Jordan Lee"
                   value={draftName}
@@ -387,9 +381,9 @@ export function ParticipantsStep() {
                 />
                 <input
                   aria-label="Filter participants"
-                  className="w-full rounded-2xl border border-[var(--line)] bg-white/70 py-2.5 pl-10 pr-4 text-sm text-[var(--ink)] shadow-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]"
+                  className="input-field py-2 pl-9"
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search names or initials…"
+                  placeholder="Search names…"
                   value={search}
                 />
               </div>
@@ -445,10 +439,12 @@ export function ParticipantsStep() {
           </div>
         </article>
 
-        <aside className="panel flex flex-col p-5 sm:p-6 lg:sticky lg:top-5">
-          <p className="eyebrow mb-2 text-[0.65rem]">Next step</p>
-          <p className="display text-4xl leading-none text-[var(--ink)]">{rows.length}</p>
-          <p className="mt-1.5 text-sm font-medium text-[var(--muted)]">people at the table</p>
+        <aside className="panel flex flex-col p-4 sm:p-5 lg:sticky lg:top-20">
+          <p className="section-label mb-2">Group size</p>
+          <p className="text-3xl font-bold tabular-nums leading-none text-[var(--ink)]">
+            {rows.length}
+          </p>
+          <p className="mt-1 text-sm text-[var(--muted)]">people</p>
 
           {rows.length > 0 ? (
             <div className="mt-5 flex flex-wrap items-center gap-2">

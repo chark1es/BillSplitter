@@ -11,14 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "#/components/ui/dialog";
+import { PageHeader } from "../../components/layout/page-header";
 
 type BillSummaryScreenProps = {
   bill: BillDetail;
-  eyebrow: string;
-  title: string;
-  description: string;
-  /** When set, hero matches bill wizard steps (badge + layout). */
-  wizardStep?: number;
+  suppressHeader?: boolean;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
   headerExtras?: ReactNode;
   contentTop?: ReactNode;
   sidePanel: ReactNode;
@@ -76,10 +76,10 @@ function SplitSpendExportCard({
 
 export function BillSummaryScreen({
   bill,
+  suppressHeader = false,
   eyebrow,
   title,
   description,
-  wizardStep,
   headerExtras,
   contentTop,
   sidePanel,
@@ -193,7 +193,7 @@ export function BillSummaryScreen({
       : false;
 
   return (
-    <div className={wizardStep != null ? "space-y-5 sm:space-y-6" : "space-y-6"}>
+    <div className="space-y-4">
       <div
         aria-hidden
         className="pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-max"
@@ -203,82 +203,38 @@ export function BillSummaryScreen({
         </div>
       </div>
 
-      <section
-        className={
-          wizardStep != null
-            ? "hero-panel relative overflow-hidden px-5 py-7 sm:px-9 sm:py-9"
-            : "hero-panel px-7 py-8 sm:px-10 sm:py-10"
-        }
-      >
-        {wizardStep != null ? (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[var(--accent-soft)] blur-3xl sm:h-64 sm:w-64"
-          />
-        ) : null}
-        {wizardStep != null ? (
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
-            <div className="min-w-0 flex-1">
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-full border border-[var(--line)] bg-white/70 px-2 text-xs font-bold tabular-nums text-[var(--accent)] shadow-sm">
-                  {wizardStep}
-                </span>
-                <span className="eyebrow">{eyebrow}</span>
-              </div>
-              <h1 className="display text-3xl leading-[1.05] text-[var(--ink)] sm:text-4xl lg:text-[2.75rem]">
-                {title}
-              </h1>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
-                {description}
-              </p>
-            </div>
-            {headerExtras ? (
-              <div className="w-full shrink-0 lg:max-w-[min(100%,20rem)] lg:text-right">
-                {headerExtras}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <>
-            <p className="eyebrow mb-3">{eyebrow}</p>
-            <h1 className="display text-4xl text-[var(--ink)] sm:text-6xl">{title}</h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)]">
-              {description}
-            </p>
-            {headerExtras ? <div className="mt-4">{headerExtras}</div> : null}
-          </>
-        )}
-      </section>
+      {!suppressHeader && title ? (
+        <PageHeader
+          actions={headerExtras}
+          description={description}
+          label={eyebrow}
+          title={title}
+        />
+      ) : null}
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <article className="panel min-w-0 p-5 sm:p-6">
-          <div className="bill-total-card !p-4 sm:!p-5">
-            <p className="eyebrow">Receipt total</p>
-            <p className="display mt-2 text-4xl text-[var(--ink)] sm:text-5xl">
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start">
+        <article className="panel min-w-0 p-4 sm:p-5">
+          <div className="bill-total-card p-3 sm:p-4">
+            <p className="section-label">Total</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink)] sm:text-3xl">
               ${summary.grandTotal.toFixed(2)}
             </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3 sm:gap-3">
-              <div className="rounded-[1.1rem] border border-[var(--line)] bg-white/70 px-3 py-2">
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">
-                  Items
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">
+            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+              <div className="panel-inset px-2.5 py-2">
+                <p className="text-[0.65rem] font-medium text-[var(--muted)]">Items</p>
+                <p className="mt-0.5 font-semibold tabular-nums text-[var(--ink)]">
                   ${summary.itemsSubtotal.toFixed(2)}
                 </p>
               </div>
-              <div className="rounded-[1.1rem] border border-[var(--line)] bg-white/70 px-3 py-2">
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">
-                  Tax & tip
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">
+              <div className="panel-inset px-2.5 py-2">
+                <p className="text-[0.65rem] font-medium text-[var(--muted)]">Tax & tip</p>
+                <p className="mt-0.5 font-semibold tabular-nums text-[var(--ink)]">
                   ${summary.taxAndTip.toFixed(2)}
                 </p>
               </div>
-              <div className="rounded-[1.1rem] border border-[var(--line)] bg-white/70 px-3 py-2">
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-[var(--muted)]">
-                  People
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">
+              <div className="panel-inset px-2.5 py-2">
+                <p className="text-[0.65rem] font-medium text-[var(--muted)]">People</p>
+                <p className="mt-0.5 font-semibold text-[var(--ink)]">
                   {summary.summaries.length}
                 </p>
               </div>
@@ -333,10 +289,7 @@ export function BillSummaryScreen({
                 const itemCount = items.length;
 
                 return (
-                  <article
-                    className="bill-card !p-3.5 sm:!p-4"
-                    key={participant.id}
-                  >
+                  <article className="bill-row" key={participant.id}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2.5">
@@ -370,7 +323,7 @@ export function BillSummaryScreen({
                       </div>
 
                       <div className="shrink-0 text-right">
-                        <p className="display text-2xl leading-none text-[var(--ink)] sm:text-3xl">
+                        <p className="text-xl font-bold tabular-nums leading-none text-[var(--ink)]">
                           ${total.toFixed(2)}
                         </p>
                         {items.length > 0 ? (
@@ -391,7 +344,7 @@ export function BillSummaryScreen({
           </div>
         </article>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {sidePanel}
           <ReceiptPreviewRail
             compact
@@ -404,11 +357,11 @@ export function BillSummaryScreen({
       </section>
 
       <Dialog onOpenChange={(open) => !open && setSelectedParticipantId(null)} open={Boolean(selectedParticipantSummary)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[1.7rem] border border-[var(--line)] bg-[var(--surface)] p-5 sm:max-w-xl sm:p-6">
+        <DialogContent className="max-h-[90vh] overflow-y-auto border border-[var(--line)] bg-[var(--surface)] p-4 sm:max-w-xl sm:p-5">
           {selectedParticipantSummary ? (
             <>
               <DialogHeader>
-                <DialogTitle className="display text-3xl text-[var(--ink)]">
+                <DialogTitle className="page-title text-xl">
                   {selectedParticipantSummary.participant.name}
                 </DialogTitle>
                 <DialogDescription className="text-[var(--muted)]">

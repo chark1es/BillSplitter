@@ -31,16 +31,16 @@ export function SharePage({
   return (
     <BillSummaryScreen
       bill={bill}
-      description="Use the compact summary for the group chat, keep the receipt close, and reopen the same bill in the wizard whenever you need to revise it."
-      eyebrow="Confirmed"
+      description="Copy the summary for your group chat or reopen the bill to make changes."
+      eyebrow="Saved"
       sidePanel={
-        <aside className="panel p-6">
-          <p className="eyebrow mb-3">Share actions</p>
-          <button className="primary-button w-full justify-center" onClick={copySummary}>
+        <aside className="panel p-4 sm:p-5">
+          <p className="section-label mb-3">Share</p>
+          <button className="primary-button w-full" onClick={copySummary} type="button">
             {copied ? "Copied!" : "Copy summary"}
           </button>
           <button
-            className="secondary-button mt-4 w-full justify-center"
+            className="secondary-button mt-2 w-full"
             disabled={isEditing}
             onClick={async () => {
               setIsEditing(true);
@@ -49,17 +49,11 @@ export function SharePage({
             }}
             type="button"
           >
-            {isEditing ? "Opening editor..." : "Edit bill"}
+            {isEditing ? "Opening…" : "Edit bill"}
           </button>
-          <div className="mt-4 rounded-[1.6rem] border border-[var(--line)] bg-[var(--surface-2)] p-4">
-            <p className="text-sm leading-6 text-[var(--muted)]">
-              This page is the canonical saved summary. Editing reopens the same bill
-              inside the wizard and overwrites it on the next save.
-            </p>
-          </div>
         </aside>
       }
-      title="The split is saved and ready to send."
+      title={bill.title}
     />
   );
 }

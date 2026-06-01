@@ -20,20 +20,19 @@ function AccessDeniedPage() {
   const deniedProfile = auth.deniedProfile;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-6 py-12">
-      <section className="panel p-8 sm:p-10">
-        <p className="eyebrow mb-3">Invite only</p>
-        <h1 className="display text-4xl text-[var(--ink)]">No access yet</h1>
-        <p className="mt-4 text-base leading-7 text-[var(--muted)]">
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
+      <section className="panel p-6 sm:p-8">
+        <p className="section-label mb-2">Invite only</p>
+        <h1 className="page-title">No access yet</h1>
+        <p className="mt-3 text-sm text-[var(--muted)]">
           Signed in as{" "}
           <span className="font-semibold text-[var(--ink)]">
             {deniedProfile?.email ?? "your account"}
           </span>
-          , but this workspace has not been unlocked for you. Ask an admin for an
-          invite, then sign in again with the same email.
+          . Ask an admin for an invite, then sign in again with the same email.
         </p>
         <button
-          className="primary-button mt-8 w-full justify-center"
+          className="primary-button mt-6 w-full"
           type="button"
           onClick={async () => {
             await authClient.signOut();

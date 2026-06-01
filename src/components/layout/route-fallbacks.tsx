@@ -4,21 +4,19 @@ export function DefaultCatchBoundary({ error }: { error: Error }) {
   const router = useRouter();
 
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-3xl items-center px-6 py-16">
-      <section className="panel w-full p-8 sm:p-10">
-        <p className="eyebrow mb-4">Something Broke</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl">
-          FairShare hit an unexpected edge case.
-        </h1>
-        <div className="mt-4 text-sm text-[var(--muted)]">
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-lg items-center px-4 py-12">
+      <section className="panel w-full p-6 sm:p-8">
+        <p className="section-label mb-2">Error</p>
+        <h1 className="page-title">Something went wrong</h1>
+        <div className="mt-3 text-sm text-[var(--muted)]">
           <ErrorComponent error={error} />
         </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button className="primary-button" onClick={() => router.invalidate()}>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button className="primary-button" onClick={() => router.invalidate()} type="button">
             Try again
           </button>
           <Link className="secondary-button no-underline" to="/dashboard">
-            Back to dashboard
+            Back to bills
           </Link>
         </div>
       </section>
@@ -28,19 +26,16 @@ export function DefaultCatchBoundary({ error }: { error: Error }) {
 
 export function DefaultNotFound() {
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-3xl items-center px-6 py-16">
-      <section className="panel w-full p-8 sm:p-10">
-        <p className="eyebrow mb-4">Not Found</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl">
-          That page does not exist in FairShare.
-        </h1>
-        <p className="mt-4 max-w-xl text-base text-[var(--muted)]">
-          The route may be invalid, or the bill you tried to open may no longer be
-          available to this account.
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-lg items-center px-4 py-12">
+      <section className="panel w-full p-6 sm:p-8">
+        <p className="section-label mb-2">Not found</p>
+        <h1 className="page-title">Page not found</h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          This link may be invalid, or the bill is no longer available.
         </p>
-        <div className="mt-8">
+        <div className="mt-5">
           <Link className="primary-button no-underline" to="/dashboard">
-            Go home
+            Go to bills
           </Link>
         </div>
       </section>

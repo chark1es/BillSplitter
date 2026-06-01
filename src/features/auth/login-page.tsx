@@ -6,20 +6,6 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const envConfigured = hasConfiguredConvex(getPublicEnv().convexUrl);
-  const features = [
-    {
-      title: "Protected sign-in",
-      body: "Google OAuth plus session-aware routing. No guest access.",
-    },
-    {
-      title: "Saved state",
-      body: "Drafts, participants, assignments, and summaries stay on your account.",
-    },
-    {
-      title: "Built for the table",
-      body: "Upload, assign, review, and send without losing your place.",
-    },
-  ] as const;
 
   const handleGoogleSignIn = async () => {
     try {
@@ -37,62 +23,52 @@ export function LoginPage({ redirectTo }: { redirectTo?: string }) {
     }
   };
 
-  // Do not redirect from the client when useSession() is truthy. That fought TanStack's login beforeLoad
-  // (server getViewerSession): dashboard → unauthenticated → /login → client redirect → loop. Router redirect
-  // in login.tsx runs when context.auth is already satisfied.
-
   return (
-    <main className="mx-auto grid min-h-[100svh] w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-8 lg:px-8 lg:py-12">
-      <section className="hero-panel px-6 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
-        <p className="eyebrow mb-3">FairShare</p>
-        <h1 className="display text-4xl text-[var(--ink)] sm:text-5xl lg:max-w-3xl lg:text-7xl">
-          Turn a messy receipt into a clean group payout flow.
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--muted)] sm:text-lg sm:leading-8">
-          FairShare turns the splitter concept into a protected app with saved drafts, guided multi-step routes, and a share-ready summary for every dinner.
-        </p>
-        <ul className="auth-feature-grid mt-8">
-          {features.map((feature) => (
-            <li key={feature.title} className="auth-feature-item list-none">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)] sm:text-sm">
-                {feature.title}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-[0.95rem]">{feature.body}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+    <main className="mx-auto flex min-h-[100svh] w-full max-w-md flex-col justify-center px-4 py-8">
+      <div className="panel p-6 sm:p-8">
+        <p className="mb-5 text-lg font-bold text-[var(--ink)]">FairShare</p>
 
-      <section className="panel p-6 sm:p-8 lg:p-10">
-        <p className="eyebrow mb-3">Login</p>
-        <h2 className="display text-3xl text-[var(--ink)] sm:text-4xl">Continue with Google.</h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted)] sm:text-base sm:leading-7">
-          Invite-only workspace. Once signed in, routes and data are scoped to your account.
+        <h1 className="page-title">Split the check, fairly</h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Upload a receipt, assign items to friends, and share what everyone owes.
         </p>
+
+        <ul className="mt-5 space-y-2 text-sm text-[var(--muted)]">
+          <li className="flex gap-2">
+            <span aria-hidden className="text-[var(--accent)]">
+              ·
+            </span>
+            <span>Sign in with Google — invite-only workspace</span>
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden className="text-[var(--accent)]">
+              ·
+            </span>
+            <span>Drafts and confirmed bills stay on your account</span>
+          </li>
+        </ul>
+
         {!envConfigured ? (
-          <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Set `VITE_CONVEX_URL`, `VITE_CONVEX_SITE_URL` (or `CONVEX_SITE_URL`), `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` before testing the live auth flow.
+          <p className="mt-5 rounded-[var(--radius-control)] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Configure Convex and auth env vars before testing sign-in.
           </p>
         ) : null}
+
         <button
-          className="primary-button mt-6 w-full justify-center text-base"
+          className="primary-button mt-6 w-full"
           disabled={isPending}
           onClick={handleGoogleSignIn}
+          type="button"
         >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/18 text-base sm:h-10 sm:w-10 sm:text-lg">
-            G
-          </span>
-          {isPending ? "Redirecting to Google..." : "Sign in with Google"}
+          {isPending ? "Redirecting…" : "Continue with Google"}
         </button>
-        <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
-          Callback target: <span className="font-semibold text-[var(--ink)]">{redirectTo || "/dashboard"}</span>
-        </p>
+
         {errorMessage ? (
-          <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p className="mt-4 rounded-[var(--radius-control)] border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {errorMessage}
           </p>
         ) : null}
-      </section>
+      </div>
     </main>
   );
 }
