@@ -1,7 +1,14 @@
 type ForeignPricedItem = {
   foreignPrice: number;
   usdPrice: number;
+  quantity?: number;
 };
+
+const lineTotalForeign = (item: ForeignPricedItem) =>
+  item.foreignPrice * Math.max(1, Math.floor(item.quantity ?? 1));
+
+const lineTotalUsd = (item: ForeignPricedItem) =>
+  item.usdPrice * Math.max(1, Math.floor(item.quantity ?? 1));
 
 type ReceiptTotalsInput = {
   items: ForeignPricedItem[];
@@ -15,11 +22,11 @@ type ReceiptTotalsInput = {
 
 export const calculateParsedReceiptSubtotalForeign = (
   receipt: Pick<ReceiptTotalsInput, "items">,
-) => receipt.items.reduce((sum, item) => sum + item.foreignPrice, 0);
+) => receipt.items.reduce((sum, item) => sum + lineTotalForeign(item), 0);
 
 export const calculateParsedReceiptSubtotalUsd = (
   receipt: Pick<ReceiptTotalsInput, "items">,
-) => receipt.items.reduce((sum, item) => sum + item.usdPrice, 0);
+) => receipt.items.reduce((sum, item) => sum + lineTotalUsd(item), 0);
 
 export const calculateParsedReceiptGrandTotalForeign = (
   receipt: Pick<

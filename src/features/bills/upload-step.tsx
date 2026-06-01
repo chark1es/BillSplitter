@@ -25,6 +25,7 @@ import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 import { cn } from "../../lib/utils";
+import { formatReceiptMoney, isUsdReceipt } from "../../lib/receipt/receipt-currency";
 
 type PreviewRow = {
   id: string;
@@ -315,6 +316,7 @@ export function UploadStep() {
               translatedName: item.translatedName,
               foreignPrice: item.foreignPrice,
               usdPrice: item.usdPrice,
+              quantity: item.quantity,
             })),
             taxTipMode: parsed.taxTipMode,
             taxForeignAmount: parsed.taxForeignAmount,
@@ -653,64 +655,102 @@ export function UploadStep() {
                 <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
                   Receipt math
                 </p>
-                <div className="mt-2 grid gap-3 text-xs sm:grid-cols-2 sm:gap-6">
+                <div
+                  className={`mt-2 grid gap-3 text-xs ${isUsdReceipt(parsedReceipt.currencyCode) ? "" : "sm:grid-cols-2 sm:gap-6"}`}
+                >
+                  {!isUsdReceipt(parsedReceipt.currencyCode) ? (
+                    <dl className="space-y-1">
+                      <div className="flex justify-between gap-3 tabular-nums">
+                        <dt className="text-[var(--muted)]">Sub</dt>
+                        <dd className="font-medium text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            computedSubtotalForeign,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 tabular-nums">
+                        <dt className="text-[var(--muted)]">+Tax</dt>
+                        <dd>
+                          {formatReceiptMoney(
+                            parsedReceipt.taxForeignAmount,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 tabular-nums">
+                        <dt className="text-[var(--muted)]">+Tip</dt>
+                        <dd>
+                          {formatReceiptMoney(
+                            parsedReceipt.tipForeignAmount,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 tabular-nums">
+                        <dt className="text-[var(--muted)]">−Disc</dt>
+                        <dd>
+                          {formatReceiptMoney(
+                            discountForeignAmount,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 tabular-nums">
+                        <dt className="font-semibold text-[var(--ink)]">Σ</dt>
+                        <dd className="font-bold text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            adjustedGrandTotalForeign,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : null}
                   <dl className="space-y-1">
                     <div className="flex justify-between gap-3 tabular-nums">
                       <dt className="text-[var(--muted)]">Sub</dt>
                       <dd className="font-medium text-[var(--ink)]">
-                        {computedSubtotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
+                        {formatReceiptMoney(computedSubtotalUsd, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-3 tabular-nums">
                       <dt className="text-[var(--muted)]">+Tax</dt>
-                      <dd>{parsedReceipt.taxForeignAmount.toFixed(2)}</dd>
+                      <dd>
+                        {formatReceiptMoney(parsedReceipt.taxUsdAmount, parsedReceipt.currencyCode)}
+                      </dd>
                     </div>
                     <div className="flex justify-between gap-3 tabular-nums">
                       <dt className="text-[var(--muted)]">+Tip</dt>
-                      <dd>{parsedReceipt.tipForeignAmount.toFixed(2)}</dd>
+                      <dd>
+                        {formatReceiptMoney(parsedReceipt.tipUsdAmount, parsedReceipt.currencyCode)}
+                      </dd>
                     </div>
                     <div className="flex justify-between gap-3 tabular-nums">
                       <dt className="text-[var(--muted)]">−Disc</dt>
-                      <dd>{discountForeignAmount.toFixed(2)}</dd>
+                      <dd>
+                        {formatReceiptMoney(discountUsdAmount, parsedReceipt.currencyCode)}
+                      </dd>
                     </div>
                     <div className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 tabular-nums">
                       <dt className="font-semibold text-[var(--ink)]">Σ</dt>
                       <dd className="font-bold text-[var(--ink)]">
-                        {adjustedGrandTotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
-                    </div>
-                  </dl>
-                  <dl className="space-y-1">
-                    <div className="flex justify-between gap-3 tabular-nums">
-                      <dt className="text-[var(--muted)]">Sub</dt>
-                      <dd className="font-medium text-[var(--ink)]">
-                        {computedSubtotalUsd.toFixed(2)} USD
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-3 tabular-nums">
-                      <dt className="text-[var(--muted)]">+Tax</dt>
-                      <dd>{parsedReceipt.taxUsdAmount.toFixed(2)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-3 tabular-nums">
-                      <dt className="text-[var(--muted)]">+Tip</dt>
-                      <dd>{parsedReceipt.tipUsdAmount.toFixed(2)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-3 tabular-nums">
-                      <dt className="text-[var(--muted)]">−Disc</dt>
-                      <dd>{discountUsdAmount.toFixed(2)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-3 border-t border-[var(--line)] pt-1 tabular-nums">
-                      <dt className="font-semibold text-[var(--ink)]">Σ</dt>
-                      <dd className="font-bold text-[var(--ink)]">
-                        {adjustedGrandTotalUsd.toFixed(2)} USD
+                        {formatReceiptMoney(adjustedGrandTotalUsd, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                   </dl>
                 </div>
-                <p className="mt-2 text-[0.65rem] leading-snug text-[var(--muted)]">
-                  USD amounts use the snapshot rate above; changing FX updates item USD
-                  values elsewhere in the flow.
-                </p>
+                {!isUsdReceipt(parsedReceipt.currencyCode) ? (
+                  <p className="mt-2 text-[0.65rem] leading-snug text-[var(--muted)]">
+                    USD amounts use the snapshot rate above; changing FX updates item USD
+                    values elsewhere in the flow.
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}

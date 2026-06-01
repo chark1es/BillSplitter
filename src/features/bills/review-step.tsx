@@ -6,18 +6,17 @@ import { api } from "../../../convex/_generated/api";
 import {
   buildBillSummary,
   buildShareSummaryText,
-  flattenAssignmentMap,
+  hydrateBillWithAssignments,
 } from "../../lib/bill-calculations";
+import { getItemQuantity, normalizeAssignmentMap } from "../../lib/assignments/assignment-map";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
 import type { BillDetail, FxSnapshot, TaxTipMode } from "../../lib/types";
 import { BillSummaryScreen } from "./bill-summary-screen";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
-import {
-  formatOptionalMoneyInput,
-  useBillWizardRoutePreload,
-} from "./bill-wizard-routing";
+import { useBillWizardRoutePreload } from "./bill-wizard-routing";
+import { useDeferredMoneyField } from "./use-deferred-money-field";
 
 const fallbackFxSnapshot = (): FxSnapshot => ({
   baseCurrency: "USD",
@@ -32,27 +31,20 @@ export function ReviewStep() {
   const { draft, patchDraft, hydrated } = useActiveBillDraft();
   useBillWizardRoutePreload("/bills/new/review");
 
-  const [taxInput, setTaxInput] = useState("");
-  const [tipInput, setTipInput] = useState("");
   const [mode, setMode] = useState<TaxTipMode>("proportional");
   const [copied, setCopied] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const bill = useMemo(() => (draft ? localDraftToBillDetail(draft) : null), [draft]);
 
-  const assignments = useMemo(() => {
-    if (!draft) return [];
-    return flattenAssignmentMap(draft.assignments).map((assignment) => ({
-      id: assignment.id as BillDetail["assignments"][number]["id"],
-      itemId: assignment.itemId as BillDetail["items"][number]["id"],
-      participantId:
-        assignment.participantId as BillDetail["participants"][number]["id"],
-    }));
-  }, [draft]);
-
   const billWithAssignments = useMemo(() => {
-    if (!bill) return null;
-    return { ...bill, assignments };
-  }, [assignments, bill]);
+    if (!bill || !draft) return null;
+    return hydrateBillWithAssignments(
+      bill,
+      normalizeAssignmentMap(draft.assignments),
+      draft.sharedUnitSplits,
+    );
+  }, [bill, draft]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -64,20 +56,22 @@ export function ReviewStep() {
   useEffect(() => {
     const parsed = draft?.receipt.parsed;
     if (!parsed) return;
-    setTaxInput(formatOptionalMoneyInput(parsed.taxUsdAmount));
-    setTipInput(formatOptionalMoneyInput(parsed.tipUsdAmount));
     setMode(parsed.taxTipMode);
-  }, [draft?.receipt.parsed]);
+  }, [draft?.receipt.parsed?.taxTipMode]);
 
   const itemsSubtotal = useMemo(
-    () => bill?.items.reduce((sum, item) => sum + item.price, 0) ?? 0,
+    () =>
+      bill?.items.reduce(
+        (sum, item) => sum + item.price * getItemQuantity(item),
+        0,
+      ) ?? 0,
     [bill],
   );
 
   const previewBill: BillDetail | null = useMemo(() => {
-    if (!billWithAssignments) return null;
-    const taxAmount = Number.parseFloat(taxInput) || 0;
-    const tipAmount = Number.parseFloat(tipInput) || 0;
+    if (!billWithAssignments || !draft?.receipt.parsed) return null;
+    const taxAmount = draft.receipt.parsed.taxUsdAmount;
+    const tipAmount = draft.receipt.parsed.tipUsdAmount;
     return {
       ...billWithAssignments,
       taxAmount,
@@ -85,7 +79,7 @@ export function ReviewStep() {
       taxTipMode: mode,
       grandTotal: itemsSubtotal + taxAmount + tipAmount,
     };
-  }, [billWithAssignments, taxInput, tipInput, mode, itemsSubtotal]);
+  }, [billWithAssignments, draft?.receipt.parsed, mode, itemsSubtotal]);
 
   const summary = useMemo(() => {
     if (!previewBill) return null;
@@ -130,12 +124,27 @@ export function ReviewStep() {
     });
   };
 
+  const taxField = useDeferredMoneyField({
+    committedAmount: draft?.receipt.parsed?.taxUsdAmount ?? 0,
+    resetKey: draft?.updatedAt,
+    onCommit: (amount) => updateDraftTotals({ taxUsdAmount: amount }),
+  });
+
+  const tipField = useDeferredMoneyField({
+    committedAmount: draft?.receipt.parsed?.tipUsdAmount ?? 0,
+    resetKey: `${draft?.updatedAt}-tip`,
+    onCommit: (amount) => updateDraftTotals({ tipUsdAmount: amount }),
+  });
+
   const handleSave = async () => {
     if (!draft || !previewBill || !summary || !draft.receipt.parsed) return;
 
-    const taxAmount = Number.parseFloat(taxInput) || 0;
-    const tipAmount = Number.parseFloat(tipInput) || 0;
+    setSaveError(null);
+    const taxAmount = draft.receipt.parsed.taxUsdAmount;
+    const tipAmount = draft.receipt.parsed.tipUsdAmount;
+    const normalizedAssignments = normalizeAssignmentMap(draft.assignments);
 
+    try {
     const { billId } = (await createConfirmedBillMutation.mutateAsync({
       billId: draft.linkedBillId,
       receiptImageUrls: draft.receipt.pages.map((p) => p.ufsUrl),
@@ -152,6 +161,7 @@ export function ReviewStep() {
         price: item.usdPrice,
         foreignPrice: item.foreignPrice,
         usdPrice: item.usdPrice,
+        quantity: item.quantity,
       })),
       itemLocalIds: draft.receipt.parsed.items.map((item) => item.id),
       taxAmount,
@@ -162,20 +172,28 @@ export function ReviewStep() {
         initials: participant.initials,
         color: participant.color,
         isSelf: participant.isSelf,
+        isBirthday: participant.isBirthday,
+        birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
       })),
       participantLocalIds: draft.participants.map((participant) => participant.id),
-      assignments: Object.entries(draft.assignments).map(
-        ([itemLocalId, participantLocalIds]) => ({
-          itemLocalId,
-          participantLocalIds,
-        }),
-      ),
+      assignments: draft.receipt.parsed.items.map((item) => ({
+        itemLocalId: item.id,
+        entries: (normalizedAssignments[item.id] ?? []).map((entry) => ({
+          participantLocalId: entry.participantId,
+          quantity: entry.quantity,
+        })),
+      })),
     })) as { billId: BillDetail["id"] };
 
     patchDraft((prev) => ({
       ...prev,
       linkedBillId: billId,
     }));
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Could not save bill. Try again.",
+      );
+    }
   };
 
   const copySummary = async () => {
@@ -205,43 +223,25 @@ export function ReviewStep() {
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-1 text-sm">
-                <span className="font-semibold text-[var(--ink)]">Tax (USD)</span>
+                <span className="font-semibold text-[var(--ink)]">Tax</span>
                 <input
                   className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   inputMode="decimal"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setTaxInput(value);
-                    if (!value.trim()) {
-                      updateDraftTotals({ taxUsdAmount: 0 });
-                      return;
-                    }
-                    const next = Number.parseFloat(value);
-                    if (Number.isFinite(next)) {
-                      updateDraftTotals({ taxUsdAmount: next });
-                    }
-                  }}
-                  value={taxInput}
+                  onBlur={taxField.onBlur}
+                  onChange={taxField.onChange}
+                  onFocus={taxField.onFocus}
+                  value={taxField.value}
                 />
               </label>
               <label className="grid gap-1 text-sm">
-                <span className="font-semibold text-[var(--ink)]">Tip (USD)</span>
+                <span className="font-semibold text-[var(--ink)]">Tip</span>
                 <input
                   className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-[var(--ink)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   inputMode="decimal"
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setTipInput(value);
-                    if (!value.trim()) {
-                      updateDraftTotals({ tipUsdAmount: 0 });
-                      return;
-                    }
-                    const next = Number.parseFloat(value);
-                    if (Number.isFinite(next)) {
-                      updateDraftTotals({ tipUsdAmount: next });
-                    }
-                  }}
-                  value={tipInput}
+                  onBlur={tipField.onBlur}
+                  onChange={tipField.onChange}
+                  onFocus={tipField.onFocus}
+                  value={tipField.value}
                 />
               </label>
             </div>
@@ -288,9 +288,22 @@ export function ReviewStep() {
                 : "Saving creates a confirmed bill and keeps this draft open so you can still jump back and edit any step."}
             </p>
 
+            {!summary.isFullyAssigned ? (
+              <p className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Some items are not fully assigned. You can still save — totals reflect
+                current assignments only.
+              </p>
+            ) : null}
+
+            {saveError ? (
+              <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                {saveError}
+              </p>
+            ) : null}
+
             <button
-              className="primary-button mt-8 w-full justify-center"
-              disabled={!summary.isFullyAssigned || createConfirmedBillMutation.isPending}
+              className="primary-button mt-4 w-full justify-center"
+              disabled={createConfirmedBillMutation.isPending}
               onClick={() => void handleSave()}
               type="button"
             >

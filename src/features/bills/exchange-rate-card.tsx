@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredFxMoneyPair } from "./use-deferred-money-field";
 import { RefreshCw } from "lucide-react";
 import { Button } from "#/components/ui/button";
 import { Input } from "#/components/ui/input";
@@ -62,11 +63,22 @@ export function ExchangeRateCard({
   const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd;
   const inverseUsdPerForeign = 1 / rate;
 
+  const focusedRef = useRef(false);
+  const amountFields = useDeferredFxMoneyPair({
+    foreignAmount: receiptTotalForeign,
+    usdAmount: receiptTotalUsd,
+    rate: parsedReceipt.fxSnapshot.foreignUnitsPerUsd,
+    resetKey: `${receiptTotalForeign}-${receiptTotalUsd}`,
+    onCommit: (foreign, usd) => {
+      setForeignAmount(formatMoneyInput(foreign));
+      setUsdAmount(formatMoneyInput(usd));
+    },
+  });
+
   useEffect(() => {
-    if (!isForeignReceipt) {
+    if (!isForeignReceipt || focusedRef.current) {
       return;
     }
-
     setForeignAmount(formatMoneyInput(receiptTotalForeign));
     setUsdAmount(formatMoneyInput(receiptTotalUsd));
   }, [isForeignReceipt, receiptTotalForeign, receiptTotalUsd]);
@@ -76,39 +88,15 @@ export function ExchangeRateCard({
   }
 
   const handleForeignAmountChange = (value: string) => {
+    focusedRef.current = true;
+    amountFields.foreign.onChange(value);
     setForeignAmount(value);
-
-    if (!value.trim()) {
-      setUsdAmount("");
-      return;
-    }
-
-    const next = Number(value);
-    if (!Number.isFinite(next)) {
-      return;
-    }
-
-    setUsdAmount(
-      formatMoneyInput(convertForeignToUsd(next, parsedReceipt.fxSnapshot)),
-    );
   };
 
   const handleUsdAmountChange = (value: string) => {
+    focusedRef.current = true;
+    amountFields.usd.onChange(value);
     setUsdAmount(value);
-
-    if (!value.trim()) {
-      setForeignAmount("");
-      return;
-    }
-
-    const next = Number(value);
-    if (!Number.isFinite(next)) {
-      return;
-    }
-
-    setForeignAmount(
-      formatMoneyInput(convertUsdToForeign(next, parsedReceipt.fxSnapshot)),
-    );
   };
 
   const handleRefreshRate = async () => {
@@ -170,7 +158,12 @@ export function ExchangeRateCard({
           <Input
             className="h-9 rounded-xl border-[var(--line)] bg-white/80 px-3 text-sm text-[var(--ink)]"
             inputMode="decimal"
+            onBlur={() => {
+              amountFields.foreign.onBlur();
+              focusedRef.current = false;
+            }}
             onChange={(event) => handleForeignAmountChange(event.target.value)}
+            onFocus={amountFields.foreign.onFocus}
             placeholder={`0.00`}
             type="text"
             value={foreignAmount}
@@ -183,7 +176,12 @@ export function ExchangeRateCard({
           <Input
             className="h-9 rounded-xl border-[var(--line)] bg-white/80 px-3 text-sm text-[var(--ink)]"
             inputMode="decimal"
+            onBlur={() => {
+              amountFields.usd.onBlur();
+              focusedRef.current = false;
+            }}
             onChange={(event) => handleUsdAmountChange(event.target.value)}
+            onFocus={amountFields.usd.onFocus}
             placeholder="0.00"
             type="text"
             value={usdAmount}

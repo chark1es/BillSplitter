@@ -54,6 +54,8 @@ export default defineSchema({
     initials: v.string(),
     color: v.string(),
     isSelf: v.boolean(),
+    isBirthday: v.optional(v.boolean()),
+    birthdayCoveredByParticipantIds: v.optional(v.array(v.string())),
     sortOrder: v.number(),
   }).index("by_bill", ["billId"]),
 
@@ -64,6 +66,7 @@ export default defineSchema({
     foreignPrice: v.optional(v.number()),
     usdPrice: v.optional(v.number()),
     price: v.number(),
+    quantity: v.optional(v.number()),
     sortOrder: v.number(),
   }).index("by_bill", ["billId"]),
 
@@ -71,6 +74,7 @@ export default defineSchema({
     billId: v.id("bills"),
     itemId: v.id("billItems"),
     participantId: v.id("billParticipants"),
+    quantity: v.optional(v.number()),
   })
     .index("by_bill", ["billId"])
     .index("by_bill_and_item", ["billId", "itemId"])

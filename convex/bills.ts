@@ -81,8 +81,8 @@ const deleteBillCascade = async (ctx: MutationCtx, billId: Id<"bills">) => {
 
 const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-const itemsSubtotal = (items: { price: number }[]) =>
-  items.reduce((sum, item) => sum + item.price, 0);
+const itemsSubtotal = (items: { price: number; quantity?: number }[]) =>
+  items.reduce((sum, item) => sum + item.price * (item.quantity ?? 1), 0);
 
 /** Defaults for bills created before receiptImageUrls / tax / tip fields existed. */
 const billFinancialDefaults = (bill: {
@@ -183,6 +183,8 @@ const billPayload = (
       initials: participant.initials,
       color: participant.color,
       isSelf: participant.isSelf,
+      isBirthday: participant.isBirthday,
+      birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
     })),
     items: orderedItems.map((item) => ({
       id: item._id,
@@ -191,11 +193,13 @@ const billPayload = (
       foreignPrice: item.foreignPrice ?? item.price,
       usdPrice: item.usdPrice ?? item.price,
       price: item.price,
+      quantity: item.quantity,
     })),
     assignments: assignments.map((assignment) => ({
       id: assignment._id,
       itemId: assignment.itemId,
       participantId: assignment.participantId,
+      quantity: assignment.quantity,
     })),
   };
 };
@@ -257,6 +261,12 @@ const parsedItemValidator = v.object({
   originalLabel: v.optional(v.string()),
   foreignPrice: v.number(),
   usdPrice: v.number(),
+  quantity: v.optional(v.number()),
+});
+
+const assignmentEntryValidator = v.object({
+  participantLocalId: v.string(),
+  quantity: v.number(),
 });
 
 const receiptMetadataValidator = v.object({
@@ -288,6 +298,7 @@ const insertBillItems = async (
     originalLabel?: string;
     foreignPrice: number;
     usdPrice: number;
+    quantity?: number;
   }>,
 ) => {
   const itemIds: Id<"billItems">[] = [];
@@ -299,6 +310,7 @@ const insertBillItems = async (
       originalLabel: item.originalLabel,
       foreignPrice: item.foreignPrice,
       usdPrice: item.usdPrice,
+      quantity: item.quantity,
       sortOrder,
     });
     itemIds.push(insertedId);
@@ -314,6 +326,8 @@ const insertBillParticipants = async (
     initials: string;
     color: string;
     isSelf: boolean;
+    isBirthday?: boolean;
+    birthdayCoveredByParticipantIds?: string[];
   }>,
 ) => {
   const participantIds: Id<"billParticipants">[] = [];
@@ -324,6 +338,8 @@ const insertBillParticipants = async (
       initials: participant.initials,
       color: participant.color,
       isSelf: participant.isSelf,
+      isBirthday: participant.isBirthday,
+      birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
       sortOrder,
     });
     participantIds.push(insertedId);
@@ -383,13 +399,16 @@ export const createConfirmedBill = mutation({
         initials: v.string(),
         color: v.string(),
         isSelf: v.boolean(),
+        isBirthday: v.optional(v.boolean()),
+        birthdayCoveredByParticipantIds: v.optional(v.array(v.string())),
       }),
     ),
     participantLocalIds: v.array(v.string()),
     assignments: v.array(
       v.object({
         itemLocalId: v.string(),
-        participantLocalIds: v.array(v.string()),
+        participantLocalIds: v.optional(v.array(v.string())),
+        entries: v.optional(v.array(assignmentEntryValidator)),
       }),
     ),
   },
@@ -490,8 +509,15 @@ export const createConfirmedBill = mutation({
         throw new Error("Unknown item id in assignments");
       }
 
-      for (const participantLocalId of row.participantLocalIds) {
-        const participantId = participantIdByLocalId.get(participantLocalId);
+      const entries =
+        row.entries ??
+        (row.participantLocalIds ?? []).map((participantLocalId) => ({
+          participantLocalId,
+          quantity: 1,
+        }));
+
+      for (const entry of entries) {
+        const participantId = participantIdByLocalId.get(entry.participantLocalId);
         if (!participantId) {
           throw new Error("Unknown participant id in assignments");
         }
@@ -500,6 +526,7 @@ export const createConfirmedBill = mutation({
           billId,
           itemId,
           participantId,
+          quantity: entry.quantity,
         });
       }
     }
@@ -542,6 +569,8 @@ export const saveParticipants = mutation({
         initials: v.string(),
         color: v.string(),
         isSelf: v.boolean(),
+        isBirthday: v.optional(v.boolean()),
+        birthdayCoveredByParticipantIds: v.optional(v.array(v.string())),
       }),
     ),
   },
@@ -568,6 +597,8 @@ export const saveParticipants = mutation({
         initials: participant.initials,
         color: participant.color,
         isSelf: participant.isSelf,
+        isBirthday: participant.isBirthday,
+        birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
         sortOrder,
       });
     }
@@ -581,7 +612,15 @@ export const saveParticipants = mutation({
 export const saveAssignments = mutation({
   args: {
     billId: v.id("bills"),
-    assignments: v.record(v.string(), v.array(v.string())),
+    assignments: v.record(
+      v.string(),
+      v.array(
+        v.object({
+          participantId: v.string(),
+          quantity: v.number(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const bill = await loadBill(ctx, args.billId);
@@ -594,12 +633,13 @@ export const saveAssignments = mutation({
       await ctx.db.delete(assignment._id);
     }
 
-    for (const [itemId, participantIds] of Object.entries(args.assignments)) {
-      for (const participantId of participantIds) {
+    for (const [itemId, entries] of Object.entries(args.assignments)) {
+      for (const entry of entries) {
         await ctx.db.insert("billAssignments", {
           billId: args.billId,
           itemId: itemId as Id<"billItems">,
-          participantId: participantId as Id<"billParticipants">,
+          participantId: entry.participantId as Id<"billParticipants">,
+          quantity: entry.quantity,
         });
       }
     }

@@ -50,8 +50,11 @@ const bill = {
 describe("bill calculations", () => {
   it("builds a stable assignment map", () => {
     expect(createAssignmentMap(bill.assignments)).toEqual({
-      i1: ["p1", "p2"],
-      i2: ["p1"],
+      i1: [
+        { participantId: "p1", quantity: 1 },
+        { participantId: "p2", quantity: 1 },
+      ],
+      i2: [{ participantId: "p1", quantity: 1 }],
     });
   });
 
@@ -65,8 +68,8 @@ describe("bill calculations", () => {
 
   it("hydrates temporary assignment edits into a bill shape", () => {
     const workingBill = hydrateBillWithAssignments(bill, {
-      i1: ["p1"],
-      i2: ["p2"],
+      i1: [{ participantId: "p1", quantity: 1 }],
+      i2: [{ participantId: "p2", quantity: 1 }],
     });
 
     const summary = buildBillSummary(workingBill);
@@ -85,5 +88,64 @@ describe("bill calculations", () => {
   it("builds share-ready summary text", () => {
     expect(buildShareSummaryText(bill)).toContain("Dinner: $20.00");
     expect(buildShareSummaryText(bill)).toContain("You: $14.00");
+  });
+
+  it("adds a shared split pool on top of exclusive assignments", () => {
+    const splitBill = hydrateBillWithAssignments(
+      {
+        ...bill,
+        items: [{ id: "i1", name: "Wings", price: 10, quantity: 5 }],
+        assignments: [],
+        participants: [
+          { id: "p1", name: "Bob", initials: "BO", color: "#000", isSelf: false },
+          { id: "p2", name: "John", initials: "JO", color: "#111", isSelf: false },
+        ],
+      } as unknown as BillDetail,
+      {
+        i1: [
+          { participantId: "p1", quantity: 2 },
+          { participantId: "p2", quantity: 2 },
+        ],
+      },
+      {
+        i1: { units: 1, participantIds: ["p1", "p2"] },
+      },
+    );
+
+    const summary = buildBillSummary(splitBill);
+    expect(summary.summaries[0]?.itemSubtotal).toBeCloseTo(25, 2);
+    expect(summary.summaries[1]?.itemSubtotal).toBeCloseTo(25, 2);
+    expect(summary.isFullyAssigned).toBe(true);
+  });
+
+  it("redistributes birthday person totals to coverers", () => {
+    const birthdayBill = {
+      ...bill,
+      taxAmount: 4,
+      tipAmount: 0,
+      participants: [
+        { id: "p1", name: "You", initials: "ME", color: "#000", isSelf: false, isBirthday: true },
+        { id: "p2", name: "Alex", initials: "AK", color: "#111", isSelf: false },
+        { id: "p3", name: "Sam", initials: "SR", color: "#222", isSelf: false },
+      ],
+      assignments: [
+        { id: "a1", itemId: "i1", participantId: "p1", quantity: 1 },
+        { id: "a2", itemId: "i1", participantId: "p2", quantity: 1 },
+        { id: "a3", itemId: "i2", participantId: "p1", quantity: 1 },
+      ],
+    } as unknown as BillDetail;
+
+    const summary = buildBillSummary(birthdayBill);
+    const birthdayRow = summary.summaries.find((row) => row.participant.id === "p1");
+    const alexRow = summary.summaries.find((row) => row.participant.id === "p2");
+    const samRow = summary.summaries.find((row) => row.participant.id === "p3");
+
+    expect(birthdayRow?.total).toBe(0);
+    expect(alexRow?.total).toBeGreaterThan(6);
+    expect(samRow?.total).toBeGreaterThan(0);
+    expect((alexRow?.birthdayCoverIn ?? 0) + (samRow?.birthdayCoverIn ?? 0)).toBeCloseTo(
+      (birthdayRow?.birthdayCoverOut ?? 0),
+      2,
+    );
   });
 });

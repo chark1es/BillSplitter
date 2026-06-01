@@ -7,12 +7,30 @@ import {
   hydrateBillWithAssignments,
   type BillSummaryRow,
 } from "../../lib/bill-calculations";
+import {
+  getAssignedQuantity,
+  getItemQuantity,
+  mergeParticipantAssignment,
+  normalizeAssignmentMap,
+} from "../../lib/assignments/assignment-map";
+import {
+  getItemAssignmentCardStatus,
+  itemAssignmentCardClassName,
+} from "../../lib/assignments/item-assignment-status";
+import {
+  getEffectiveAssignedUnits,
+  getMaxSharedSplitUnits,
+  getParticipantEffectiveUnits,
+} from "../../lib/assignments/shared-unit-splits";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import type { AssignmentMap, BillDetail } from "../../lib/types";
+import { AssignQtyDialog } from "./assign-qty-dialog";
+import { AssignSplitDialog } from "./assign-split-dialog";
+import type { SharedUnitSplitsMap } from "../../lib/types";
+import { ParticipantRoleBadges } from "./participant-role-badges";
 import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
-import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { localDraftToBillDetail } from "../../lib/drafts/local-draft-to-bill-detail";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 import {
@@ -31,9 +49,25 @@ export function AssignStep() {
   const [splitDetailForParticipantId, setSplitDetailForParticipantId] = useState<
     string | null
   >(null);
-  const [assignmentMap, setAssignmentMap] = useState<AssignmentMap>(
-    {},
-  );
+  const [assignmentMap, setAssignmentMap] = useState<AssignmentMap>({});
+  const [sharedUnitSplits, setSharedUnitSplits] = useState<SharedUnitSplitsMap>({});
+  const [qtyDialog, setQtyDialog] = useState<{
+    itemId: string;
+    participantId: string;
+    itemName: string;
+    participantName: string;
+    maxQuantity: number;
+    initialQuantity: number;
+    itemQuantity: number;
+    allowRemove?: boolean;
+  } | null>(null);
+  const [splitDialog, setSplitDialog] = useState<{
+    itemId: string;
+    itemName: string;
+    itemQuantity: number;
+    initialSelectedIds: string[];
+    initialSplitQuantity: number;
+  } | null>(null);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
@@ -46,7 +80,8 @@ export function AssignStep() {
 
   useEffect(() => {
     if (!draft) return;
-    setAssignmentMap(draft.assignments);
+    setAssignmentMap(normalizeAssignmentMap(draft.assignments));
+    setSharedUnitSplits(draft.sharedUnitSplits ?? {});
   }, [draft]);
 
   useEffect(() => {
@@ -58,8 +93,8 @@ export function AssignStep() {
 
   const workingBill = useMemo(() => {
     if (!bill) return null;
-    return hydrateBillWithAssignments(bill, assignmentMap);
-  }, [assignmentMap, bill]);
+    return hydrateBillWithAssignments(bill, assignmentMap, sharedUnitSplits);
+  }, [assignmentMap, bill, sharedUnitSplits]);
 
   const summary = useMemo(() => {
     if (!workingBill) return null;
@@ -75,15 +110,42 @@ export function AssignStep() {
 
   const serverAssignmentMap = draft?.assignments ?? {};
 
-  const assignmentsDirty = useMemo(
-    () => !assignmentMapsEqualForItems(itemIds, assignmentMap, serverAssignmentMap),
-    [assignmentMap, itemIds, serverAssignmentMap],
-  );
+  const serverSharedSplits = draft?.sharedUnitSplits ?? {};
+
+  const assignmentsDirty = useMemo(() => {
+    const assignmentsChanged = !assignmentMapsEqualForItems(
+      itemIds,
+      assignmentMap,
+      serverAssignmentMap,
+    );
+    const splitsChanged =
+      JSON.stringify(sharedUnitSplits) !== JSON.stringify(serverSharedSplits);
+    return assignmentsChanged || splitsChanged;
+  }, [
+    assignmentMap,
+    itemIds,
+    serverAssignmentMap,
+    serverSharedSplits,
+    sharedUnitSplits,
+  ]);
   const totalItems = bill?.items.length ?? 0;
+  const normalizedMap = useMemo(
+    () => normalizeAssignmentMap(assignmentMap),
+    [assignmentMap],
+  );
   const assignedItemCount = useMemo(() => {
     if (!bill) return 0;
-    return bill.items.filter((item) => (assignmentMap[item.id] ?? []).length > 0).length;
-  }, [assignmentMap, bill]);
+    return bill.items.filter((item) => {
+      const itemId = item.id as string;
+      const itemQty = getItemQuantity(item);
+      const assigned = getEffectiveAssignedUnits(
+        normalizedMap,
+        itemId,
+        sharedUnitSplits[itemId],
+      );
+      return assigned === itemQty || (itemQty === 1 && assigned > 1);
+    }).length;
+  }, [bill, normalizedMap, sharedUnitSplits]);
 
   useEffect(() => {
     if (!assignmentsDirty || !bill) {
@@ -94,17 +156,19 @@ export function AssignStep() {
       patchDraft((prev) => ({
         ...prev,
         assignments: assignmentMap,
+        sharedUnitSplits,
       }));
       setSaveStatus("saved");
       window.setTimeout(() => setSaveStatus("idle"), 2000);
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [assignmentsDirty, assignmentMap, patchDraft, bill]);
+  }, [assignmentsDirty, assignmentMap, sharedUnitSplits, patchDraft, bill]);
 
   const saveNow = () => {
     patchDraft((prev) => ({
       ...prev,
       assignments: assignmentMap,
+      sharedUnitSplits,
     }));
     setSaveStatus("saved");
     window.setTimeout(() => setSaveStatus("idle"), 2000);
@@ -114,6 +178,7 @@ export function AssignStep() {
     patchDraft((prev) => ({
       ...prev,
       assignments: assignmentMap,
+      sharedUnitSplits,
     }));
     navigate({
       to: "/bills/new/review",
@@ -121,29 +186,123 @@ export function AssignStep() {
     });
   };
 
-  const toggleAssignment = (itemId: string, participantId: string) => {
-    setAssignmentMap((currentValue) => {
-      const currentParticipants = currentValue[itemId] ?? [];
-      const nextParticipants = currentParticipants.includes(participantId)
-        ? currentParticipants.filter((id) => id !== participantId)
-        : [...currentParticipants, participantId];
+  const formatUnits = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(1);
 
+  const setParticipantQuantity = (
+    itemId: string,
+    participantId: string,
+    quantity: number,
+  ) => {
+    setAssignmentMap((currentValue) => {
+      const normalized = normalizeAssignmentMap(currentValue);
       return {
         ...currentValue,
-        [itemId]: nextParticipants,
+        [itemId]: mergeParticipantAssignment(
+          normalized[itemId] ?? [],
+          participantId,
+          quantity,
+        ),
       };
     });
   };
 
-  const assignAllParticipants = (itemId: string) => {
-    if (!bill) return;
-    setAssignmentMap((currentValue) => ({
-      ...currentValue,
-      [itemId]: bill.participants.map((participant) => participant.id),
+  const handleParticipantTap = (
+    item: BillDetail["items"][number],
+    participantId: string,
+    participantName: string,
+  ) => {
+    const itemId = item.id as string;
+    const itemQty = getItemQuantity(item);
+    const normalized = normalizeAssignmentMap(assignmentMap);
+    const existing = (normalized[itemId] ?? []).find(
+      (entry) => entry.participantId === participantId,
+    );
+    const split = sharedUnitSplits[itemId];
+    const credited = existing?.quantity ?? 0;
+    const remaining =
+      itemQty -
+      getAssignedQuantity(normalized, itemId) -
+      (split?.units ?? 0) +
+      credited;
+
+    if (remaining <= 0 && !existing && itemQty > 1) {
+      return;
+    }
+
+    const maxQuantity =
+      itemQty === 1 ? 1 : Math.max(remaining, 1);
+
+    setQtyDialog({
+      itemId,
+      participantId,
+      itemName: item.name,
+      participantName,
+      maxQuantity,
+      initialQuantity: existing?.quantity ?? (itemQty === 1 ? 1 : 1),
+      itemQuantity: itemQty,
+      allowRemove: Boolean(existing),
+    });
+  };
+
+  const openSplitDialog = (itemId: string, itemName: string, itemQuantity: number) => {
+    const normalized = normalizeAssignmentMap(assignmentMap);
+    const split = sharedUnitSplits[itemId];
+    const initialSelectedIds = split?.participantIds ?? [];
+    const initialSplitQuantity = split
+      ? split.units
+      : getMaxSharedSplitUnits(normalized, itemId, itemQuantity, split);
+
+    setSplitDialog({
+      itemId,
+      itemName,
+      itemQuantity,
+      initialSelectedIds,
+      initialSplitQuantity,
+    });
+  };
+
+  const applySplit = (
+    itemId: string,
+    splitQuantity: number,
+    participantIds: string[],
+  ) => {
+    if (participantIds.length === 0 || splitQuantity <= 0) {
+      return;
+    }
+    const itemQty = getItemQuantity(
+      bill!.items.find((row) => (row.id as string) === itemId)!,
+    );
+    const normalized = normalizeAssignmentMap(assignmentMap);
+    const prior = sharedUnitSplits[itemId];
+    const nextTotal =
+      getAssignedQuantity(normalized, itemId) -
+      (prior?.units ?? 0) +
+      splitQuantity;
+    if (nextTotal > itemQty) {
+      return;
+    }
+
+    setSharedUnitSplits((current) => ({
+      ...current,
+      [itemId]: { units: splitQuantity, participantIds },
     }));
   };
 
+  const clearSharedSplit = (itemId: string) => {
+    setSharedUnitSplits((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
+  };
+
   const clearAssignments = (itemId: string) => {
+    setSharedUnitSplits((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
     setAssignmentMap((currentValue) => ({
       ...currentValue,
       [itemId]: [],
@@ -198,21 +357,50 @@ export function AssignStep() {
           </div>
           <div className="mt-1 grid gap-2">
             {bill.items.map((item) => {
-              const assignedIds = assignmentMap[item.id] ?? [];
+              const itemId = item.id as string;
+              const itemQty = getItemQuantity(item);
+              const entries = normalizedMap[itemId] ?? [];
+              const lineSplit = sharedUnitSplits[itemId];
+              const assignedQty = getEffectiveAssignedUnits(
+                normalizedMap,
+                itemId,
+                lineSplit,
+              );
+              const assignmentStatus = getItemAssignmentCardStatus(
+                normalizedMap,
+                itemId,
+                itemQty,
+                lineSplit,
+              );
               const isExpanded = expandedItemId === item.id;
-              const hasAssignees = assignedIds.length > 0;
-              const assignedPeople = assignedIds
-                .map((id) => participantById[id])
-                .filter(Boolean);
-              const everyoneAssigned = assignedIds.length === bill.participants.length;
-
+              const assignedPeople = [
+                ...entries.map((entry) => ({
+                  participant: participantById[entry.participantId],
+                  quantity: getParticipantEffectiveUnits(
+                    normalizedMap,
+                    itemId,
+                    entry.participantId,
+                    lineSplit,
+                  ),
+                })),
+                ...(lineSplit?.participantIds ?? [])
+                  .filter(
+                    (participantId) =>
+                      !entries.some((entry) => entry.participantId === participantId),
+                  )
+                  .map((participantId) => ({
+                    participant: participantById[participantId],
+                    quantity: getParticipantEffectiveUnits(
+                      normalizedMap,
+                      itemId,
+                      participantId,
+                      lineSplit,
+                    ),
+                  })),
+              ].filter((row) => row.participant && row.quantity > 0);
               return (
                 <article
-                  className={`rounded-2xl border px-2.5 py-2 transition-all duration-200 sm:px-3 sm:py-2.5 ${
-                    hasAssignees
-                      ? "border-emerald-500/30 bg-emerald-600/[0.07] shadow-[0_8px_24px_rgba(14,116,62,0.12)]"
-                      : "border-rose-400/35 bg-rose-500/[0.07]"
-                  }`}
+                  className={`rounded-2xl border px-2.5 py-2 transition-all duration-200 sm:px-3 sm:py-2.5 ${itemAssignmentCardClassName(assignmentStatus)}`}
                   key={item.id}
                 >
                   <button
@@ -225,21 +413,34 @@ export function AssignStep() {
                     type="button"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="mb-0.5 inline-flex items-center rounded-full border border-[var(--line)] bg-white/70 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] sm:text-[0.62rem]">
-                        {assignedIds.length}/{bill.participants.length} selected
+                      <span className="mb-0.5 inline-flex items-center gap-1.5">
+                        <span className="inline-flex rounded-full border border-[var(--line)] bg-white/70 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] sm:text-[0.62rem]">
+                          {assignedQty}/{itemQty} assigned
+                        </span>
+                        {itemQty > 1 ? (
+                          <span className="inline-flex rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[0.58rem] font-bold text-[var(--accent-strong)]">
+                            ×{itemQty}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="block text-[0.72rem] font-semibold leading-snug text-[var(--ink)] sm:text-xs">
                         {item.name}
                       </span>
                       <span className="mt-0.5 block text-[0.66rem] tabular-nums text-[var(--muted)] sm:text-[0.72rem]">
                         ${item.price.toFixed(2)}
+                        {itemQty > 1 ? ` each · $${(item.price * itemQty).toFixed(2)} line` : ""}
                       </span>
                     </span>
                     {!isExpanded ? (
                       <span className="max-w-[58%] shrink-0 text-right">
                         {assignedPeople.length > 0 ? (
                           <span className="line-clamp-2 text-[0.63rem] leading-snug text-[var(--muted)] sm:text-[0.7rem]">
-                            {assignedPeople.map((p) => p.name).join(", ")}
+                            {assignedPeople
+                              .map(
+                                ({ participant, quantity }) =>
+                                  `${participant!.name} (${formatUnits(quantity)})`,
+                              )
+                              .join(", ")}
                           </span>
                         ) : (
                           <span className="text-[0.65rem] text-rose-700/90 sm:text-xs">
@@ -258,14 +459,25 @@ export function AssignStep() {
                         </p>
                         <div className="flex items-center gap-1.5">
                           <button
-                            className={`mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem] ${everyoneAssigned ? "border-emerald-600/45 bg-emerald-600/15 text-emerald-700" : ""}`}
-                            onClick={() => assignAllParticipants(item.id)}
+                            className="mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem]"
+                            onClick={() =>
+                              openSplitDialog(itemId, item.name, itemQty)
+                            }
                             type="button"
                           >
-                            Everyone
+                            Split…
                           </button>
+                          {lineSplit ? (
+                            <button
+                              className="mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem]"
+                              onClick={() => clearSharedSplit(itemId)}
+                              type="button"
+                            >
+                              Clear split
+                            </button>
+                          ) : null}
                           <button
-                            className={`mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem] ${assignedIds.length === 0 ? "border-rose-500/45 bg-rose-500/14 text-rose-700" : ""}`}
+                            className={`mini-chip px-2 py-0.5 text-[0.62rem] sm:text-[0.68rem] ${assignedQty === 0 ? "border-rose-500/45 bg-rose-500/14 text-rose-700" : ""}`}
                             onClick={() => clearAssignments(item.id)}
                             type="button"
                           >
@@ -275,12 +487,25 @@ export function AssignStep() {
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                       {bill.participants.map((participant) => {
-                        const isAssigned = assignedIds.includes(participant.id);
+                        const participantId = participant.id as string;
+                        const effectiveQty = getParticipantEffectiveUnits(
+                          normalizedMap,
+                          itemId,
+                          participantId,
+                          lineSplit,
+                        );
+                        const isAssigned = effectiveQty > 0;
                         return (
                           <button
                             className={`mini-chip py-1 text-[0.66rem] sm:text-[0.72rem] ${isAssigned ? "border-transparent shadow-[0_6px_14px_rgba(31,22,17,0.14)]" : ""}`}
                             key={participant.id}
-                            onClick={() => toggleAssignment(item.id, participant.id)}
+                            onClick={() =>
+                              handleParticipantTap(
+                                item,
+                                participantId,
+                                participant.name,
+                              )
+                            }
                             style={
                               isAssigned
                                 ? {
@@ -293,9 +518,11 @@ export function AssignStep() {
                             type="button"
                           >
                             <span
-                              className={`inline-flex h-4 w-4 items-center justify-center rounded-full border text-[0.58rem] font-bold ${isAssigned ? "border-current bg-current/15" : "border-[var(--line)] bg-white/60 text-[var(--muted)]"}`}
+                              className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full border px-0.5 text-[0.58rem] font-bold ${isAssigned ? "border-current bg-current/15" : "border-[var(--line)] bg-white/60 text-[var(--muted)]"}`}
                             >
-                              {isAssigned ? "✓" : participant.initials}
+                              {isAssigned
+                                ? formatUnits(effectiveQty)
+                                : participant.initials}
                             </span>
                             <span>{participant.name}</span>
                           </button>
@@ -349,7 +576,7 @@ export function AssignStep() {
                           <span className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--ink)]">
                             {participant.name}
                           </span>
-                          <ParticipantPaidBadge isSelf={participant.isSelf} size="compact" />
+                          <ParticipantRoleBadges participant={participant} size="compact" />
                         </span>
                         <span className="shrink-0 text-[0.8125rem] font-semibold tabular-nums tracking-tight text-[var(--ink)]">
                           ${total.toFixed(2)}
@@ -392,10 +619,52 @@ export function AssignStep() {
           >
             {summary.isFullyAssigned
               ? "Next: review split"
-              : "Assign every item to continue"}
+              : "Assign all item quantities to continue"}
           </button>
         </aside>
       </section>
+
+      <AssignSplitDialog
+        currentEntries={
+          splitDialog
+            ? (normalizedMap[splitDialog.itemId] ?? [])
+            : []
+        }
+        existingSplit={
+          splitDialog ? sharedUnitSplits[splitDialog.itemId] : null
+        }
+        initialSelectedIds={splitDialog?.initialSelectedIds ?? []}
+        initialSplitQuantity={splitDialog?.initialSplitQuantity ?? 0}
+        itemName={splitDialog?.itemName ?? ""}
+        itemQuantity={splitDialog?.itemQuantity ?? 1}
+        onClose={() => setSplitDialog(null)}
+        onConfirm={(splitQuantity, participantIds) => {
+          if (!splitDialog) return;
+          applySplit(splitDialog.itemId, splitQuantity, participantIds);
+        }}
+        unitPrice={
+          splitDialog
+            ? (bill.items.find((row) => row.id === splitDialog.itemId)?.price ?? 0)
+            : 0
+        }
+        open={splitDialog != null}
+        participants={bill.participants}
+      />
+
+      <AssignQtyDialog
+        allowRemove={qtyDialog?.allowRemove}
+        initialQuantity={qtyDialog?.initialQuantity ?? 1}
+        itemName={qtyDialog?.itemName ?? ""}
+        itemQuantity={qtyDialog?.itemQuantity}
+        maxQuantity={qtyDialog?.maxQuantity ?? 1}
+        onClose={() => setQtyDialog(null)}
+        onConfirm={(quantity) => {
+          if (!qtyDialog) return;
+          setParticipantQuantity(qtyDialog.itemId, qtyDialog.participantId, quantity);
+        }}
+        open={qtyDialog != null}
+        participantName={qtyDialog?.participantName ?? ""}
+      />
 
       <Dialog
         onOpenChange={(open) => !open && setSplitDetailForParticipantId(null)}
@@ -439,7 +708,8 @@ function SplitDetailModalBody({
   bill: BillDetail;
   onClose: () => void;
 }) {
-  const { participant, items, itemSubtotal, taxTipShare, total } = row;
+  const { participant, items, itemSubtotal, taxTipShare, total, birthdayCoverIn, birthdayCoverOut } =
+    row;
   const { taxShare, tipShare } = apportionTaxAndTip(
     taxTipShare,
     bill.taxAmount,
@@ -466,7 +736,7 @@ function SplitDetailModalBody({
               {participant.name}
             </DialogTitle>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <ParticipantPaidBadge isSelf={participant.isSelf} />
+              <ParticipantRoleBadges participant={participant} />
               <span className="text-xs text-[var(--muted)]">{tipModeLabel}</span>
             </div>
           </div>
@@ -488,13 +758,14 @@ function SplitDetailModalBody({
           </p>
         ) : (
           <ul className="divide-y divide-[var(--line)] rounded-xl border border-[var(--line)] bg-white/60">
-            {items.map(({ item, share }) => (
+            {items.map(({ item, share, quantity }) => (
               <li
                 className="flex items-center justify-between gap-3 px-3 py-2.5 first:rounded-t-xl last:rounded-b-xl"
                 key={item.id}
               >
                 <span className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">
                   {item.name}
+                  {quantity > 1 ? ` ×${quantity}` : ""}
                 </span>
                 <span className="shrink-0 tabular-nums text-sm font-semibold text-[var(--ink)]">
                   ${share.toFixed(2)}
@@ -525,6 +796,18 @@ function SplitDetailModalBody({
             <div className="flex justify-between gap-4 tabular-nums">
               <dt className="text-[var(--muted)]">Tax &amp; tip</dt>
               <dd className="text-[var(--ink)]">${taxTipShare.toFixed(2)}</dd>
+            </div>
+          ) : null}
+          {birthdayCoverIn != null && birthdayCoverIn > 0 ? (
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-[var(--muted)]">Covering birthday</dt>
+              <dd className="text-[var(--ink)]">+${birthdayCoverIn.toFixed(2)}</dd>
+            </div>
+          ) : null}
+          {birthdayCoverOut != null && birthdayCoverOut > 0 ? (
+            <div className="flex justify-between gap-4 tabular-nums">
+              <dt className="text-[var(--muted)]">Birthday (covered)</dt>
+              <dd className="text-[var(--ink)]">$0.00</dd>
             </div>
           ) : null}
           <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-2 tabular-nums">

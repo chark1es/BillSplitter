@@ -36,6 +36,7 @@ export const billDetailToLocalDraft = (bill: BillDetail): LocalBillDraft => {
           translatedName: item.name,
           foreignPrice: item.foreignPrice ?? item.price,
           usdPrice: item.usdPrice ?? item.price,
+          quantity: item.quantity,
         })),
         taxTipMode: bill.taxTipMode,
         taxForeignAmount: metadata?.taxForeignAmount ?? bill.taxAmount,
@@ -51,6 +52,8 @@ export const billDetailToLocalDraft = (bill: BillDetail): LocalBillDraft => {
       initials: participant.initials,
       color: participant.color,
       isSelf: participant.isSelf,
+      isBirthday: participant.isBirthday,
+      birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
     })),
     assignments: createAssignmentMap(bill.assignments),
   };

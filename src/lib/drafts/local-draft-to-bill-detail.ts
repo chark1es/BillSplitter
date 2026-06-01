@@ -10,6 +10,7 @@ export const localDraftToBillDetail = (draft: LocalBillDraft): BillDetail => {
     foreignPrice: item.foreignPrice,
     usdPrice: item.usdPrice,
     price: item.usdPrice,
+    quantity: item.quantity,
   }));
 
   const participants = draft.participants.map((participant) => ({
@@ -18,6 +19,8 @@ export const localDraftToBillDetail = (draft: LocalBillDraft): BillDetail => {
     initials: participant.initials,
     color: participant.color,
     isSelf: participant.isSelf,
+    isBirthday: participant.isBirthday,
+    birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
   }));
 
   const taxAmount = draft.receipt.parsed?.taxUsdAmount ?? 0;
@@ -49,5 +52,6 @@ export const localDraftToBillDetail = (draft: LocalBillDraft): BillDetail => {
     participants,
     items,
     assignments: [],
+    sharedUnitSplits: draft.sharedUnitSplits ?? {},
   } as BillDetail;
 };

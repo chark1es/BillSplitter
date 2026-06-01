@@ -4,6 +4,7 @@ import {
   LOCAL_BILL_DRAFT_STORAGE_KEY,
   createEmptyLocalBillDraft,
 } from "./local-bill-draft";
+import { migrateLocalBillDraft } from "./migrate-local-draft";
 
 const writeDraftToStorage = (draft: LocalBillDraft | null) => {
   try {
@@ -29,7 +30,8 @@ export function useActiveBillDraft() {
         setHydrated(true);
         return;
       }
-      const parsed = JSON.parse(raw) as LocalBillDraft;
+      const parsed = migrateLocalBillDraft(JSON.parse(raw) as LocalBillDraft);
+      writeDraftToStorage(parsed);
       setDraft(parsed);
       setHydrated(true);
     } catch {
@@ -51,7 +53,10 @@ export function useActiveBillDraft() {
     (updater: (prev: LocalBillDraft) => LocalBillDraft) => {
       setDraft((prev) => {
         const base = prev ?? createEmptyLocalBillDraft();
-        const next = { ...updater(base), updatedAt: Date.now() };
+        const next = migrateLocalBillDraft({
+          ...updater(base),
+          updatedAt: Date.now(),
+        });
         writeDraftToStorage(next);
         return next;
       });

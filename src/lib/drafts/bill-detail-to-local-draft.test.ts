@@ -64,8 +64,8 @@ describe("billDetailToLocalDraft", () => {
     expect(draft.receipt.parsed?.currencyCode).toBe("JPY");
     expect(draft.receipt.parsed?.items[0]?.foreignPrice).toBe(1800);
     expect(draft.assignments).toEqual({
-      i1: ["p1"],
-      i2: ["p2"],
+      i1: [{ participantId: "p1", quantity: 1 }],
+      i2: [{ participantId: "p2", quantity: 1 }],
     });
 
     const hydrated = localDraftToBillDetail(draft);

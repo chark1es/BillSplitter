@@ -34,6 +34,8 @@ export type BillParticipant = {
   initials: string;
   color: string;
   isSelf: boolean;
+  isBirthday?: boolean;
+  birthdayCoveredByParticipantIds?: string[];
 };
 
 export type BillItem = {
@@ -43,13 +45,28 @@ export type BillItem = {
   price: number;
   foreignPrice?: number;
   usdPrice?: number;
+  quantity?: number;
 };
 
 export type BillAssignment = {
   id: BillAssignmentId;
   itemId: BillItemId;
   participantId: BillParticipantId;
+  quantity?: number;
 };
+
+export type ItemAssignment = {
+  participantId: string;
+  quantity: number;
+};
+
+/** Even cost split of `units` across `participantIds` on one line. */
+export type SharedUnitSplit = {
+  units: number;
+  participantIds: string[];
+};
+
+export type SharedUnitSplitsMap = Record<string, SharedUnitSplit>;
 
 export type BillDetail = {
   id: BillId;
@@ -72,6 +89,7 @@ export type BillDetail = {
   participants: BillParticipant[];
   items: BillItem[];
   assignments: BillAssignment[];
+  sharedUnitSplits?: SharedUnitSplitsMap;
 };
 
 export type DashboardBill = {
@@ -94,9 +112,11 @@ export type ParticipantDraft = {
   initials: string;
   color: string;
   isSelf: boolean;
+  isBirthday?: boolean;
+  birthdayCoveredByParticipantIds?: string[];
 };
 
-export type AssignmentMap = Record<string, string[]>;
+export type AssignmentMap = Record<string, ItemAssignment[]>;
 
 export const asBillId = (value: string) => value as BillId;
 
@@ -105,6 +125,7 @@ export type ParsedReceiptItem = {
   translatedName: string;
   foreignPrice: number;
   usdPrice: number;
+  quantity?: number;
 };
 
 export type ParsedReceiptPayload = {

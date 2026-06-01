@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createColumnHelper,
   flexRender,
@@ -15,7 +15,6 @@ import { LocalDraftDisclosure } from "./local-draft-disclosure";
 import type { ParticipantDraft } from "../../lib/types";
 import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
-import { ParticipantPaidBadge } from "./participant-paid-badge";
 import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 
 const COLOR_PALETTE = [
@@ -54,6 +53,13 @@ const getInitialSelection = (
   }));
 
 type Row = ParticipantDraft & { key: string };
+type ParticipantRole = "none" | "paid" | "birthday";
+
+const roleForRow = (row: Row): ParticipantRole => {
+  if (row.isSelf) return "paid";
+  if (row.isBirthday) return "birthday";
+  return "none";
+};
 
 const columnHelper = createColumnHelper<Row>();
 
@@ -64,21 +70,27 @@ export function ParticipantsStep() {
 
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Row[]>(() =>
-    getInitialSelection(draft?.participants ?? []).map((p, i) => ({
-      ...p,
-      key: `p-${i}-${p.name}`,
+    (draft?.participants ?? []).map((participant) => ({
+      ...getInitialSelection([participant])[0]!,
+      key: participant.id,
+      isBirthday: participant.isBirthday ?? false,
+      birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
     })),
   );
+  const hydratedRowsRef = useRef(false);
 
   useEffect(() => {
-    if (!draft) return;
+    if (!hydrated || !draft || hydratedRowsRef.current) return;
+    hydratedRowsRef.current = true;
     setRows(
-      getInitialSelection(draft.participants).map((p, i) => ({
-        ...p,
-        key: `p-${i}-${p.name}`,
+      draft.participants.map((participant) => ({
+        ...getInitialSelection([participant])[0]!,
+        key: participant.id,
+        isBirthday: participant.isBirthday ?? false,
+        birthdayCoveredByParticipantIds: participant.birthdayCoveredByParticipantIds,
       })),
     );
-  }, [draft]);
+  }, [draft, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -87,8 +99,23 @@ export function ParticipantsStep() {
     }
   }, [draft, hydrated, navigate]);
 
+  useEffect(() => {
+    if (rows.length === 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      patchDraft((prev) => ({
+        ...prev,
+        participants: rows.map(({ key, ...rest }) => ({
+          id: key,
+          ...rest,
+        })),
+      }));
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [rows, patchDraft]);
+
   const [draftName, setDraftName] = useState("");
-  const [draftSelf, setDraftSelf] = useState(false);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -123,14 +150,55 @@ export function ParticipantsStep() {
           <span className="font-semibold text-[var(--ink)]">{info.getValue()}</span>
         ),
       }),
-      columnHelper.accessor("isSelf", {
-        header: "Paid",
-        cell: (info) =>
-          info.getValue() ? (
-            <ParticipantPaidBadge isSelf={true} />
-          ) : (
-            <span className="text-sm text-[var(--muted)]">—</span>
-          ),
+      columnHelper.display({
+        id: "role",
+        header: "Role",
+        cell: (info) => {
+          const row = info.row.original;
+          const role = roleForRow(row);
+          return (
+            <div className="grid gap-2">
+              <select
+                aria-label={`Role for ${row.name}`}
+                className="w-full min-w-[8.5rem] rounded-xl border border-[var(--line)] bg-white/80 px-2 py-1.5 text-xs font-semibold text-[var(--ink)]"
+                onChange={(event) =>
+                  updateParticipantRole(row.key, event.target.value as ParticipantRole)
+                }
+                value={role}
+              >
+                <option value="none">None</option>
+                <option value="paid">Paid the bill</option>
+                <option value="birthday">Birthday</option>
+              </select>
+              {row.isBirthday ? (
+                <div className="flex flex-wrap gap-1">
+                  {rows
+                    .filter((participant) => participant.key !== row.key)
+                    .map((participant) => {
+                      const selected =
+                        row.birthdayCoveredByParticipantIds?.includes(participant.key) ??
+                        false;
+                      return (
+                        <button
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[0.62rem] font-semibold transition",
+                            selected
+                              ? "border-violet-400 bg-violet-500/15 text-violet-900"
+                              : "border-[var(--line)] bg-white/60 text-[var(--muted)]",
+                          )}
+                          key={participant.key}
+                          onClick={() => toggleBirthdayCoverer(row.key, participant.key)}
+                          type="button"
+                        >
+                          {participant.name}
+                        </button>
+                      );
+                    })}
+                </div>
+              ) : null}
+            </div>
+          );
+        },
       }),
       columnHelper.display({
         id: "actions",
@@ -156,6 +224,55 @@ export function ParticipantsStep() {
     setRows((prev) => prev.filter((r) => r.key !== key));
   };
 
+  const updateParticipantRole = (key: string, role: ParticipantRole) => {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.key === key) {
+          if (role === "paid") {
+            return {
+              ...row,
+              isSelf: true,
+              isBirthday: false,
+              birthdayCoveredByParticipantIds: undefined,
+            };
+          }
+          if (role === "birthday") {
+            return {
+              ...row,
+              isSelf: false,
+              isBirthday: true,
+              birthdayCoveredByParticipantIds: prev
+                .filter((participant) => participant.key !== key)
+                .map((participant) => participant.key),
+            };
+          }
+          return {
+            ...row,
+            isSelf: false,
+            isBirthday: false,
+            birthdayCoveredByParticipantIds: undefined,
+          };
+        }
+        return role === "paid" ? { ...row, isSelf: false } : row;
+      }),
+    );
+  };
+
+  const toggleBirthdayCoverer = (birthdayKey: string, covererKey: string) => {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.key !== birthdayKey) {
+          return row;
+        }
+        const current = row.birthdayCoveredByParticipantIds ?? [];
+        const next = current.includes(covererKey)
+          ? current.filter((id) => id !== covererKey)
+          : [...current, covererKey];
+        return { ...row, birthdayCoveredByParticipantIds: next };
+      }),
+    );
+  };
+
   const addParticipant = () => {
     const name = draftName.trim();
     if (!name) {
@@ -163,24 +280,20 @@ export function ParticipantsStep() {
     }
     const initials = initialsFromName(name);
     setRows((prev) => {
-      let next = prev;
-      if (draftSelf) {
-        next = prev.map((r) => ({ ...r, isSelf: false }));
-      }
-      const color = colorForIndex(next.length);
+      const color = colorForIndex(prev.length);
       return [
-        ...next,
+        ...prev,
         {
           key: crypto.randomUUID(),
           name,
           initials,
           color,
-          isSelf: draftSelf,
+          isSelf: false,
+          isBirthday: false,
         },
       ];
     });
     setDraftName("");
-    setDraftSelf(false);
   };
 
   const canContinue = rows.length >= 2;
@@ -218,47 +331,36 @@ export function ParticipantsStep() {
               </div>
             </div>
 
-            <label className="mt-5 grid gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                Display name
-              </span>
-              <input
-                className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-[var(--ink)] shadow-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]"
-                onChange={(e) => setDraftName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addParticipant();
-                  }
-                }}
-                placeholder="e.g. Jordan Lee"
-                value={draftName}
-              />
-            </label>
-
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-[var(--line)] bg-white/50 p-3.5 transition hover:bg-white/80">
-              <input
-                checked={draftSelf}
-                className="mt-0.5 size-4 shrink-0 rounded border-[var(--line)] accent-[var(--accent)]"
-                onChange={(e) => setDraftSelf(e.target.checked)}
-                type="checkbox"
-              />
-              <span className="text-sm leading-snug text-[var(--ink)]">
-                <span className="font-semibold">Paid the bill</span>
-                <span className="block text-xs font-normal text-[var(--muted)]">
-                  Shown as &quot;Paid&quot; in summaries so everyone knows who covered the check.
+            <form
+              className="mt-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                addParticipant();
+              }}
+            >
+              <label className="grid gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
+                  Display name
                 </span>
-              </span>
-            </label>
+                <input
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-[var(--ink)] shadow-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]"
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder="e.g. Jordan Lee"
+                  value={draftName}
+                />
+              </label>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Press Enter to add. Set paid or birthday in the table after adding.
+              </p>
 
             <button
               className="secondary-button mt-5 w-full justify-center sm:w-auto"
-              onClick={addParticipant}
-              type="button"
+              type="submit"
             >
               <UserPlusIcon aria-hidden className="size-4" strokeWidth={2.25} />
               Add to list
             </button>
+            </form>
           </div>
 
           <div className="px-5 py-5 sm:px-7 sm:py-7">
@@ -354,7 +456,8 @@ export function ParticipantsStep() {
                 <span
                   className={cn(
                     "inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--surface)] text-[0.6rem] font-extrabold text-white shadow-sm",
-                    r.isSelf && "ring-2 ring-[var(--teal)] ring-offset-2 ring-offset-[var(--surface)]",
+                    (r.isSelf || r.isBirthday) &&
+                      "ring-2 ring-[var(--teal)] ring-offset-2 ring-offset-[var(--surface)]",
                   )}
                   key={r.key}
                   style={{ backgroundColor: r.color }}
@@ -371,19 +474,9 @@ export function ParticipantsStep() {
             </div>
           ) : null}
 
-          {rows.some((r) => r.isSelf) ? (
-            <p className="mt-4 flex flex-wrap items-center gap-2 text-xs leading-snug text-[var(--muted)]">
-              <ParticipantPaidBadge isSelf={true} size="compact" />
-              <span>
-                <span className="font-semibold text-[var(--ink)]">
-                  {rows.find((r) => r.isSelf)?.name}
-                </span>{" "}
-                covered the check.
-              </span>
-            </p>
-          ) : rows.length > 0 ? (
+          {rows.length > 0 ? (
             <p className="mt-4 text-xs text-[var(--muted)]">
-              Tip: check &quot;Paid the bill&quot; for whoever paid so the label shows in summaries.
+              Use the Role column for paid or birthday — no extra labels needed.
             </p>
           ) : null}
 

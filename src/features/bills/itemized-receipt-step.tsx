@@ -1,21 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { BillWizardHero } from "./bill-wizard-hero";
 import { BillWizardNavBar } from "./bill-wizard-nav";
 import { ExchangeRateCard } from "./exchange-rate-card";
 import { LocalDraftDisclosure } from "./local-draft-disclosure";
-import {
-  formatOptionalMoneyInput,
-  useBillWizardRoutePreload,
-} from "./bill-wizard-routing";
+import { useBillWizardRoutePreload } from "./bill-wizard-routing";
 import { useActiveBillDraft } from "../../lib/drafts/use-active-bill-draft";
 import { roundMoney } from "../../lib/drafts/local-bill-draft";
+import {
+  getItemQuantity,
+  normalizeAssignmentMap,
+  trimAssignmentsToQuantity,
+} from "../../lib/assignments/assignment-map";
+import { coerceItemQuantity } from "../../lib/receipt/expand-items-by-quantity";
 import {
   calculateParsedReceiptGrandTotalForeign,
   calculateParsedReceiptGrandTotalUsd,
   calculateParsedReceiptSubtotalForeign,
   calculateParsedReceiptSubtotalUsd,
 } from "../../lib/receipt/receipt-totals";
+import { formatReceiptMoney, isUsdReceipt } from "../../lib/receipt/receipt-currency";
+import { useDeferredFxMoneyPair } from "./use-deferred-money-field";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +47,7 @@ type EditableReceiptItem = {
   translatedName: string;
   foreignPrice: number;
   usdPrice: number;
+  quantity?: number;
 };
 
 export function ItemizedReceiptStep() {
@@ -51,19 +57,14 @@ export function ItemizedReceiptStep() {
   useBillWizardRoutePreload("/bills/new/itemized");
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [taxForeignInput, setTaxForeignInput] = useState("");
-  const [taxUsdInput, setTaxUsdInput] = useState("");
-  const [tipForeignInput, setTipForeignInput] = useState("");
-  const [tipUsdInput, setTipUsdInput] = useState("");
   const [editingForeignName, setEditingForeignName] = useState("");
   const [editingTranslatedName, setEditingTranslatedName] = useState("");
-  const [editingForeignPriceInput, setEditingForeignPriceInput] = useState("");
-  const [editingUsdPriceInput, setEditingUsdPriceInput] = useState("");
+  const [editingQuantityInput, setEditingQuantityInput] = useState("1");
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [newForeignName, setNewForeignName] = useState("");
   const [newTranslatedName, setNewTranslatedName] = useState("");
-  const [newForeignPriceInput, setNewForeignPriceInput] = useState("");
-  const [newUsdPriceInput, setNewUsdPriceInput] = useState("");
+  const [newItemPrices, setNewItemPrices] = useState({ foreign: 0, usd: 0 });
+  const [newItemQuantityInput, setNewItemQuantityInput] = useState("1");
   const [newItemError, setNewItemError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,26 +93,36 @@ export function ItemizedReceiptStep() {
   }, [parsedReceipt, editingItemId]);
 
   useEffect(() => {
-    if (!parsedReceipt) return;
-    setTaxForeignInput(formatOptionalMoneyInput(parsedReceipt.taxForeignAmount));
-    setTaxUsdInput(formatOptionalMoneyInput(parsedReceipt.taxUsdAmount));
-    setTipForeignInput(formatOptionalMoneyInput(parsedReceipt.tipForeignAmount));
-    setTipUsdInput(formatOptionalMoneyInput(parsedReceipt.tipUsdAmount));
-  }, [
-    parsedReceipt,
-    parsedReceipt?.taxForeignAmount,
-    parsedReceipt?.taxUsdAmount,
-    parsedReceipt?.tipForeignAmount,
-    parsedReceipt?.tipUsdAmount,
-  ]);
-
-  useEffect(() => {
     if (!editingItem) return;
     setEditingForeignName(editingItem.foreignName);
     setEditingTranslatedName(editingItem.translatedName);
-    setEditingForeignPriceInput(formatOptionalMoneyInput(editingItem.foreignPrice));
-    setEditingUsdPriceInput(formatOptionalMoneyInput(editingItem.usdPrice));
-  }, [editingItemId]);
+    setEditingQuantityInput(String(getItemQuantity(editingItem)));
+  }, [editingItem, editingItemId]);
+
+  const setItemQuantity = (itemId: string, rawQuantity: number) => {
+    const quantity = coerceItemQuantity(rawQuantity);
+    patchDraft((prev) => {
+      if (!prev.receipt.parsed) return prev;
+      const nextAssignments = { ...normalizeAssignmentMap(prev.assignments) };
+      const entries = nextAssignments[itemId];
+      if (entries) {
+        nextAssignments[itemId] = trimAssignmentsToQuantity(entries, quantity);
+      }
+      return {
+        ...prev,
+        assignments: nextAssignments,
+        receipt: {
+          ...prev.receipt,
+          parsed: {
+            ...prev.receipt.parsed,
+            items: prev.receipt.parsed.items.map((item) =>
+              item.id === itemId ? { ...item, quantity } : item,
+            ),
+          },
+        },
+      };
+    });
+  };
 
   const updateParsedReceipt = (
     updater: (
@@ -142,186 +153,81 @@ export function ItemizedReceiptStep() {
     }));
   };
 
-  const handleTaxTipForeignChange = (kind: "tax" | "tip", value: string) => {
-    const rate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
+  const fxRate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
+  const isUsd = parsedReceipt ? isUsdReceipt(parsedReceipt.currencyCode) : true;
+  const draftRevisionKey = draft?.updatedAt ?? 0;
 
-    if (kind === "tax") {
-      setTaxForeignInput(value);
-      if (!value.trim()) {
-        setTaxUsdInput("");
-        updateParsedReceipt((parsed) => ({
-          ...parsed,
-          taxForeignAmount: 0,
-          taxUsdAmount: 0,
-        }));
-        return;
-      }
-
-      const next = Number(value);
-      if (!Number.isFinite(next)) return;
-      const usd = roundMoney(next / rate);
-      setTaxUsdInput(formatOptionalMoneyInput(usd));
+  const taxFields = useDeferredFxMoneyPair({
+    foreignAmount: parsedReceipt?.taxForeignAmount ?? 0,
+    usdAmount: parsedReceipt?.taxUsdAmount ?? 0,
+    rate: fxRate,
+    resetKey: `${draftRevisionKey}-tax`,
+    onCommit: (foreign, usd) => {
       updateParsedReceipt((parsed) => ({
         ...parsed,
-        taxForeignAmount: next,
-        taxUsdAmount: usd,
+        taxForeignAmount: roundMoney(foreign),
+        taxUsdAmount: roundMoney(usd),
       }));
-      return;
-    }
+    },
+  });
 
-    setTipForeignInput(value);
-    if (!value.trim()) {
-      setTipUsdInput("");
+  const tipFields = useDeferredFxMoneyPair({
+    foreignAmount: parsedReceipt?.tipForeignAmount ?? 0,
+    usdAmount: parsedReceipt?.tipUsdAmount ?? 0,
+    rate: fxRate,
+    resetKey: `${draftRevisionKey}-tip`,
+    onCommit: (foreign, usd) => {
       updateParsedReceipt((parsed) => ({
         ...parsed,
-        tipForeignAmount: 0,
-        tipUsdAmount: 0,
+        tipForeignAmount: roundMoney(foreign),
+        tipUsdAmount: roundMoney(usd),
       }));
-      return;
-    }
+    },
+  });
 
-    const next = Number(value);
-    if (!Number.isFinite(next)) return;
-    const usd = roundMoney(next / rate);
-    setTipUsdInput(formatOptionalMoneyInput(usd));
-    updateParsedReceipt((parsed) => ({
-      ...parsed,
-      tipForeignAmount: next,
-      tipUsdAmount: usd,
-    }));
-  };
-
-  const handleTaxTipUsdChange = (kind: "tax" | "tip", value: string) => {
-    const rate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
-
-    if (kind === "tax") {
-      setTaxUsdInput(value);
-      if (!value.trim()) {
-        setTaxForeignInput("");
-        updateParsedReceipt((parsed) => ({
-          ...parsed,
-          taxUsdAmount: 0,
-          taxForeignAmount: 0,
-        }));
-        return;
-      }
-
-      const next = Number(value);
-      if (!Number.isFinite(next)) return;
-      const foreign = roundMoney(next * rate);
-      setTaxForeignInput(formatOptionalMoneyInput(foreign));
-      updateParsedReceipt((parsed) => ({
-        ...parsed,
-        taxUsdAmount: next,
-        taxForeignAmount: foreign,
-      }));
-      return;
-    }
-
-    setTipUsdInput(value);
-    if (!value.trim()) {
-      setTipForeignInput("");
-      updateParsedReceipt((parsed) => ({
-        ...parsed,
-        tipUsdAmount: 0,
-        tipForeignAmount: 0,
-      }));
-      return;
-    }
-
-    const next = Number(value);
-    if (!Number.isFinite(next)) return;
-    const foreign = roundMoney(next * rate);
-    setTipForeignInput(formatOptionalMoneyInput(foreign));
-    updateParsedReceipt((parsed) => ({
-      ...parsed,
-      tipUsdAmount: next,
-      tipForeignAmount: foreign,
-    }));
-  };
-
-  const handleEditingItemPriceChange = (currency: "foreign" | "usd", value: string) => {
-    if (!editingItem) return;
-
-    const rate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
-
-    if (currency === "foreign") {
-      setEditingForeignPriceInput(value);
-      if (!value.trim()) {
-        setEditingUsdPriceInput("");
-        updateItem(editingItem.id, (item) => ({
-          ...item,
-          foreignPrice: 0,
-          usdPrice: 0,
-        }));
-        return;
-      }
-
-      const next = Number(value);
-      if (!Number.isFinite(next)) return;
-      const usd = roundMoney(next / rate);
-      setEditingUsdPriceInput(formatOptionalMoneyInput(usd));
-      updateItem(editingItem.id, (item) => ({
+  const editPriceFields = useDeferredFxMoneyPair({
+    foreignAmount: editingItem?.foreignPrice ?? 0,
+    usdAmount: editingItem?.usdPrice ?? 0,
+    rate: fxRate,
+    resetKey: editingItemId,
+    onCommit: (foreign, usd) => {
+      if (!editingItemId) return;
+      updateItem(editingItemId, (item) => ({
         ...item,
-        foreignPrice: next,
-        usdPrice: usd,
+        foreignPrice: roundMoney(foreign),
+        usdPrice: roundMoney(usd),
       }));
-      return;
-    }
+    },
+  });
 
-    setEditingUsdPriceInput(value);
-    if (!value.trim()) {
-      setEditingForeignPriceInput("");
-      updateItem(editingItem.id, (item) => ({
-        ...item,
-        usdPrice: 0,
-        foreignPrice: 0,
-      }));
-      return;
-    }
+  const newPriceFields = useDeferredFxMoneyPair({
+    foreignAmount: newItemPrices.foreign,
+    usdAmount: newItemPrices.usd,
+    rate: fxRate,
+    resetKey: isAddItemOpen,
+    onCommit: (foreign, usd) => {
+      setNewItemPrices({ foreign: roundMoney(foreign), usd: roundMoney(usd) });
+    },
+  });
 
-    const next = Number(value);
-    if (!Number.isFinite(next)) return;
-    const foreign = roundMoney(next * rate);
-    setEditingForeignPriceInput(formatOptionalMoneyInput(foreign));
-    updateItem(editingItem.id, (item) => ({
-      ...item,
-      usdPrice: next,
-      foreignPrice: foreign,
-    }));
-  };
+  const bindMoneyField = (field: {
+    value: string;
+    onChange: (value: string) => void;
+    onFocus: () => void;
+    onBlur: () => void;
+  }) => ({
+    value: field.value,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => field.onChange(event.target.value),
+    onFocus: field.onFocus,
+    onBlur: field.onBlur,
+  });
 
   const resetNewItemForm = () => {
     setNewForeignName("");
     setNewTranslatedName("");
-    setNewForeignPriceInput("");
-    setNewUsdPriceInput("");
+    setNewItemPrices({ foreign: 0, usd: 0 });
+    setNewItemQuantityInput("1");
     setNewItemError(null);
-  };
-
-  const handleNewItemPriceChange = (currency: "foreign" | "usd", value: string) => {
-    const rate = parsedReceipt?.fxSnapshot.foreignUnitsPerUsd ?? 1;
-
-    if (currency === "foreign") {
-      setNewForeignPriceInput(value);
-      if (!value.trim()) {
-        setNewUsdPriceInput("");
-        return;
-      }
-      const next = Number(value);
-      if (!Number.isFinite(next)) return;
-      setNewUsdPriceInput(formatOptionalMoneyInput(roundMoney(next / rate)));
-      return;
-    }
-
-    setNewUsdPriceInput(value);
-    if (!value.trim()) {
-      setNewForeignPriceInput("");
-      return;
-    }
-    const next = Number(value);
-    if (!Number.isFinite(next)) return;
-    setNewForeignPriceInput(formatOptionalMoneyInput(roundMoney(next * rate)));
   };
 
   const handleAddItemSubmit = () => {
@@ -330,12 +236,10 @@ export function ItemizedReceiptStep() {
     const foreignName = newForeignName.trim();
     const translatedName = newTranslatedName.trim();
     const rate = parsedReceipt.fxSnapshot.foreignUnitsPerUsd ?? 1;
-    const foreignValue = newForeignPriceInput.trim()
-      ? Number(newForeignPriceInput)
-      : Number.NaN;
-    const usdValue = newUsdPriceInput.trim() ? Number(newUsdPriceInput) : Number.NaN;
-    const hasForeign = Number.isFinite(foreignValue);
-    const hasUsd = Number.isFinite(usdValue);
+    const foreignValue = newItemPrices.foreign;
+    const usdValue = newItemPrices.usd;
+    const hasForeign = foreignValue > 0;
+    const hasUsd = usdValue > 0;
 
     if (!foreignName && !translatedName) {
       setNewItemError("Add at least one item name.");
@@ -348,6 +252,7 @@ export function ItemizedReceiptStep() {
 
     const foreignPrice = hasForeign ? roundMoney(foreignValue) : roundMoney(usdValue * rate);
     const usdPrice = hasUsd ? roundMoney(usdValue) : roundMoney(foreignValue / rate);
+    const quantity = coerceItemQuantity(Number(newItemQuantityInput));
 
     updateParsedReceipt((parsed) => ({
       ...parsed,
@@ -362,6 +267,7 @@ export function ItemizedReceiptStep() {
           translatedName: translatedName || foreignName,
           foreignPrice,
           usdPrice,
+          quantity,
         },
       ],
     }));
@@ -443,11 +349,16 @@ export function ItemizedReceiptStep() {
                   <TableHead className="px-3 py-2.5 text-left text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
                     Name
                   </TableHead>
-                  <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
-                    {parsedReceipt.currencyCode}
+                  {!isUsd ? (
+                    <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
+                      {parsedReceipt.currencyCode}
+                    </TableHead>
+                  ) : null}
+                  <TableHead className="w-16 px-2 py-2.5 text-center text-xs font-semibold text-[var(--muted)] sm:px-3 sm:py-3">
+                    Qty
                   </TableHead>
                   <TableHead className="px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:px-4 sm:py-3">
-                    USD
+                    {isUsd ? "Price" : "USD"}
                   </TableHead>
                   <TableHead className="w-[7.5rem] px-3 py-2.5 text-right text-xs font-semibold text-[var(--muted)] sm:w-auto sm:px-4 sm:py-3">
                     <span className="hidden sm:inline">Actions</span>
@@ -468,11 +379,28 @@ export function ItemizedReceiptStep() {
                         {item.foreignName}
                       </p>
                     </TableCell>
-                    <TableCell className="px-3 py-2 text-right tabular-nums text-[var(--ink)] sm:px-4 sm:py-3">
-                      {item.foreignPrice.toFixed(2)}
+                    <TableCell className="px-2 py-2 text-center sm:px-3 sm:py-3">
+                      <input
+                        aria-label={`Quantity for ${item.translatedName}`}
+                        className="w-14 rounded-xl border border-[var(--line)] bg-white/80 px-2 py-1 text-center text-sm tabular-nums text-[var(--ink)]"
+                        inputMode="numeric"
+                        min={1}
+                        onChange={(event) =>
+                          setItemQuantity(item.id, Number(event.target.value))
+                        }
+                        type="number"
+                        value={getItemQuantity(item)}
+                      />
                     </TableCell>
+                    {!isUsd ? (
+                      <TableCell className="px-3 py-2 text-right tabular-nums text-[var(--ink)] sm:px-4 sm:py-3">
+                        {formatReceiptMoney(item.foreignPrice, parsedReceipt.currencyCode, {
+                          useDollarSign: false,
+                        })}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="px-3 py-2 text-right tabular-nums font-semibold text-[var(--ink)] sm:px-4 sm:py-3">
-                      ${item.usdPrice.toFixed(2)}
+                      {formatReceiptMoney(item.usdPrice, parsedReceipt.currencyCode)}
                     </TableCell>
                     <TableCell className="px-3 py-2 text-right sm:px-4 sm:py-3">
                       <div className="flex justify-end gap-2">
@@ -500,7 +428,7 @@ export function ItemizedReceiptStep() {
                   <TableRow className="border-[var(--line)] hover:bg-transparent">
                     <TableCell
                       className="px-4 py-8 text-center text-sm text-[var(--muted)]"
-                      colSpan={4}
+                      colSpan={isUsd ? 4 : 5}
                     >
                       No line items found yet.
                     </TableCell>
@@ -523,49 +451,51 @@ export function ItemizedReceiptStep() {
               </p>
             </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div
+              className={`mt-3 grid gap-3 ${isUsd ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4"}`}
+            >
+              {!isUsd ? (
+                <>
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-[var(--muted)]">
+                      Tax ({parsedReceipt.currencyCode})
+                    </span>
+                    <Input
+                      className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                      inputMode="decimal"
+                      type="text"
+                      {...bindMoneyField(taxFields.foreign)}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-[var(--muted)]">
+                      Tip ({parsedReceipt.currencyCode})
+                    </span>
+                    <Input
+                      className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                      inputMode="decimal"
+                      type="text"
+                      {...bindMoneyField(tipFields.foreign)}
+                    />
+                  </label>
+                </>
+              ) : null}
               <label className="grid gap-1 text-xs">
-                <span className="text-[var(--muted)]">Tax ({parsedReceipt.currencyCode})</span>
+                <span className="text-[var(--muted)]">{isUsd ? "Tax" : "Tax (USD)"}</span>
                 <Input
                   className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
                   inputMode="decimal"
-                  onChange={(e) => handleTaxTipForeignChange("tax", e.target.value)}
-                  placeholder={`0.00 ${parsedReceipt.currencyCode}`}
                   type="text"
-                  value={taxForeignInput}
+                  {...bindMoneyField(taxFields.usd)}
                 />
               </label>
               <label className="grid gap-1 text-xs">
-                <span className="text-[var(--muted)]">Tip ({parsedReceipt.currencyCode})</span>
+                <span className="text-[var(--muted)]">{isUsd ? "Tip" : "Tip (USD)"}</span>
                 <Input
                   className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
                   inputMode="decimal"
-                  onChange={(e) => handleTaxTipForeignChange("tip", e.target.value)}
-                  placeholder={`0.00 ${parsedReceipt.currencyCode}`}
                   type="text"
-                  value={tipForeignInput}
-                />
-              </label>
-              <label className="grid gap-1 text-xs">
-                <span className="text-[var(--muted)]">Tax (USD)</span>
-                <Input
-                  className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-                  inputMode="decimal"
-                  onChange={(e) => handleTaxTipUsdChange("tax", e.target.value)}
-                  placeholder="0.00 USD"
-                  type="text"
-                  value={taxUsdInput}
-                />
-              </label>
-              <label className="grid gap-1 text-xs">
-                <span className="text-[var(--muted)]">Tip (USD)</span>
-                <Input
-                  className="h-10 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-                  inputMode="decimal"
-                  onChange={(e) => handleTaxTipUsdChange("tip", e.target.value)}
-                  placeholder="0.00 USD"
-                  type="text"
-                  value={tipUsdInput}
+                  {...bindMoneyField(tipFields.usd)}
                 />
               </label>
             </div>
@@ -607,66 +537,86 @@ export function ItemizedReceiptStep() {
 
             <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 sm:px-4 sm:py-4">
               <p className="eyebrow text-[0.65rem]">Updated totals</p>
-              <div className="mt-3 grid gap-4 lg:grid-cols-2 lg:gap-6">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                    {parsedReceipt.currencyCode}
-                  </p>
-                  <dl className="mt-3 space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Subtotal</dt>
-                      <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {computedSubtotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tax</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
-                        {parsedReceipt.taxForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="text-[var(--muted)]">Tip</dt>
-                      <dd className="tabular-nums text-[var(--ink)]">
-                        {parsedReceipt.tipForeignAmount.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
-                      <dt className="font-semibold text-[var(--ink)]">Total</dt>
-                      <dd className="tabular-nums font-bold text-[var(--ink)]">
-                        {computedGrandTotalForeign.toFixed(2)} {parsedReceipt.currencyCode}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
+              <div className={`mt-3 grid gap-4 ${isUsd ? "" : "lg:grid-cols-2 lg:gap-6"}`}>
+                {!isUsd ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                      {parsedReceipt.currencyCode}
+                    </p>
+                    <dl className="mt-3 space-y-2 text-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-[var(--muted)]">Subtotal</dt>
+                        <dd className="tabular-nums font-semibold text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            computedSubtotalForeign,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-[var(--muted)]">Tax</dt>
+                        <dd className="tabular-nums text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            parsedReceipt.taxForeignAmount,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-[var(--muted)]">Tip</dt>
+                        <dd className="tabular-nums text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            parsedReceipt.tipForeignAmount,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
+                        <dt className="font-semibold text-[var(--ink)]">Total</dt>
+                        <dd className="tabular-nums font-bold text-[var(--ink)]">
+                          {formatReceiptMoney(
+                            computedGrandTotalForeign,
+                            parsedReceipt.currencyCode,
+                            { useDollarSign: false },
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                ) : null}
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                    USD
-                  </p>
+                  {!isUsd ? (
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                      USD
+                    </p>
+                  ) : null}
                   <dl className="mt-3 space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Subtotal</dt>
                       <dd className="tabular-nums font-semibold text-[var(--ink)]">
-                        {computedSubtotalUsd.toFixed(2)} USD
+                        {formatReceiptMoney(computedSubtotalUsd, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tax</dt>
                       <dd className="tabular-nums text-[var(--ink)]">
-                        {parsedReceipt.taxUsdAmount.toFixed(2)} USD
+                        {formatReceiptMoney(parsedReceipt.taxUsdAmount, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                       <dt className="text-[var(--muted)]">Tip</dt>
                       <dd className="tabular-nums text-[var(--ink)]">
-                        {parsedReceipt.tipUsdAmount.toFixed(2)} USD
+                        {formatReceiptMoney(parsedReceipt.tipUsdAmount, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                     <div className="flex items-center justify-between gap-4 border-t border-[var(--line)] pt-2">
                       <dt className="font-semibold text-[var(--ink)]">Total</dt>
                       <dd className="tabular-nums font-bold text-[var(--ink)]">
-                        {computedGrandTotalUsd.toFixed(2)} USD
+                        {formatReceiptMoney(computedGrandTotalUsd, parsedReceipt.currencyCode)}
                       </dd>
                     </div>
                   </dl>
@@ -738,7 +688,7 @@ export function ItemizedReceiptStep() {
 
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                    Translated name (USD)
+                    Display name
                   </Label>
                   <Input
                     className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
@@ -754,36 +704,44 @@ export function ItemizedReceiptStep() {
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                      Price ({parsedReceipt.currencyCode})
-                    </Label>
-                    <Input
-                      className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-                      inputMode="decimal"
-                      onChange={(e) =>
-                        handleEditingItemPriceChange("foreign", e.target.value)
-                      }
-                      placeholder={`0.00 ${parsedReceipt.currencyCode}`}
-                      type="text"
-                      value={editingForeignPriceInput}
-                    />
-                  </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                    Quantity
+                  </Label>
+                  <Input
+                    className="h-11 max-w-[8rem] rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                    inputMode="numeric"
+                    min={1}
+                    onChange={(event) => setEditingQuantityInput(event.target.value)}
+                    type="number"
+                    value={editingQuantityInput}
+                  />
+                </div>
+
+                <div className={`grid gap-4 ${isUsd ? "" : "sm:grid-cols-2"}`}>
+                  {!isUsd ? (
+                    <div className="grid gap-2">
+                      <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                        Price ({parsedReceipt.currencyCode})
+                      </Label>
+                      <Input
+                        className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                        inputMode="decimal"
+                        type="text"
+                        {...bindMoneyField(editPriceFields.foreign)}
+                      />
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                      Price (USD)
+                      {isUsd ? "Unit price" : "Price (USD)"}
                     </Label>
                     <Input
                       className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
                       inputMode="decimal"
-                      onChange={(e) =>
-                        handleEditingItemPriceChange("usd", e.target.value)
-                      }
-                      placeholder="0.00 USD"
                       type="text"
-                      value={editingUsdPriceInput}
+                      {...bindMoneyField(editPriceFields.usd)}
                     />
                   </div>
                 </div>
@@ -791,7 +749,13 @@ export function ItemizedReceiptStep() {
                 <div className="flex justify-end">
                   <Button
                     className="rounded-full border-[var(--line)] bg-white/70 px-5 text-[var(--ink)] hover:bg-white"
-                    onClick={() => setEditingItemId(null)}
+                    onClick={() => {
+                      setItemQuantity(
+                        editingItem.id,
+                        Number(editingQuantityInput),
+                      );
+                      setEditingItemId(null);
+                    }}
                     variant="outline"
                   >
                     Done
@@ -836,7 +800,7 @@ export function ItemizedReceiptStep() {
 
             <div className="grid gap-2">
               <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                Translated name (USD)
+                Display name
               </Label>
               <Input
                 className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
@@ -847,31 +811,43 @@ export function ItemizedReceiptStep() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                Quantity
+              </Label>
+              <Input
+                className="h-11 max-w-[8rem] rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                inputMode="numeric"
+                min={1}
+                onChange={(event) => setNewItemQuantityInput(event.target.value)}
+                type="number"
+                value={newItemQuantityInput}
+              />
+            </div>
+
+            <div className={`grid gap-4 ${isUsd ? "" : "sm:grid-cols-2"}`}>
+              {!isUsd ? (
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
+                    Price ({parsedReceipt.currencyCode})
+                  </Label>
+                  <Input
+                    className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
+                    inputMode="decimal"
+                    type="text"
+                    {...bindMoneyField(newPriceFields.foreign)}
+                  />
+                </div>
+              ) : null}
               <div className="grid gap-2">
                 <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                  Price ({parsedReceipt.currencyCode})
+                  {isUsd ? "Unit price" : "Price (USD)"}
                 </Label>
                 <Input
                   className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
                   inputMode="decimal"
-                  onChange={(e) => handleNewItemPriceChange("foreign", e.target.value)}
-                  placeholder={`0.00 ${parsedReceipt.currencyCode}`}
                   type="text"
-                  value={newForeignPriceInput}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label className="text-xs font-semibold tracking-wide text-[var(--muted)]">
-                  Price (USD)
-                </Label>
-                <Input
-                  className="h-11 rounded-2xl border-[var(--line)] bg-white/70 px-4 text-[var(--ink)]"
-                  inputMode="decimal"
-                  onChange={(e) => handleNewItemPriceChange("usd", e.target.value)}
-                  placeholder="0.00 USD"
-                  type="text"
-                  value={newUsdPriceInput}
+                  {...bindMoneyField(newPriceFields.usd)}
                 />
               </div>
             </div>

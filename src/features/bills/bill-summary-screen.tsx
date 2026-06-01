@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
 import { buildBillSummary } from "../../lib/bill-calculations";
 import type { BillDetail } from "../../lib/types";
-import { ParticipantPaidBadge } from "./participant-paid-badge";
+import { ParticipantRoleBadges } from "./participant-role-badges";
 import { ReceiptPreviewRail } from "./receipt-preview-rail";
 import {
   Dialog,
@@ -321,7 +321,15 @@ export function BillSummaryScreen({
 
           <div className="mt-5 grid gap-3">
             {summary.summaries.map(
-              ({ participant, total, items, taxTipShare, itemSubtotal }) => {
+              ({
+                participant,
+                total,
+                items,
+                taxTipShare,
+                itemSubtotal,
+                birthdayCoverIn,
+                birthdayCoverOut,
+              }) => {
                 const itemCount = items.length;
 
                 return (
@@ -341,7 +349,7 @@ export function BillSummaryScreen({
                           <div className="min-w-0">
                             <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-[var(--ink)]">
                               {participant.name}
-                              <ParticipantPaidBadge isSelf={participant.isSelf} />
+                              <ParticipantRoleBadges participant={participant} size="compact" />
                             </p>
                             <p className="text-xs text-[var(--muted)]">
                               {itemCount === 0
@@ -349,6 +357,12 @@ export function BillSummaryScreen({
                                 : `${itemCount} item${itemCount === 1 ? "" : "s"} · items $${itemSubtotal.toFixed(2)}`}
                               {taxTipShare > 0
                                 ? ` · tax/tip $${taxTipShare.toFixed(2)}`
+                                : ""}
+                              {birthdayCoverIn != null && birthdayCoverIn > 0
+                                ? ` · covering birthday $${birthdayCoverIn.toFixed(2)}`
+                                : ""}
+                              {birthdayCoverOut != null && birthdayCoverOut > 0
+                                ? ` · birthday covered ($${birthdayCoverOut.toFixed(2)})`
                                 : ""}
                             </p>
                           </div>

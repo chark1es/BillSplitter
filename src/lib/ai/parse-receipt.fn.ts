@@ -4,10 +4,8 @@ import type { ParsedReceiptPayload } from "../types";
 import { getServerAuth } from "../auth/server-auth";
 import { getServerEnv, hasConfiguredConvex } from "../env";
 import { convertForeignToUsd, fetchUsdFxSnapshot } from "../fx/usd-fx";
-import {
-  coerceItemQuantity,
-  expandLogicalLinesToParsedItems,
-} from "../receipt/expand-items-by-quantity";
+import { coerceItemQuantity } from "../receipt/expand-items-by-quantity";
+import { logicalLinesToGroupedItems } from "../receipt/logical-lines-to-items";
 
 const defaultModel = "google/gemini-3.1-flash-lite-preview";
 
@@ -144,7 +142,7 @@ Rules:
       };
     });
 
-    const items = expandLogicalLinesToParsedItems(logicalLines, fxSnapshot);
+    const items = logicalLinesToGroupedItems(logicalLines, fxSnapshot);
 
     const taxForeignAmount = Number(parsed.taxForeignAmount ?? 0);
     const tipForeignAmount = Number(parsed.tipForeignAmount ?? 0);

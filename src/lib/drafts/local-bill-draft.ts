@@ -1,4 +1,10 @@
-import type { TaxTipMode, AssignmentMap, FxSnapshot, BillId } from "../types";
+import type {
+  TaxTipMode,
+  AssignmentMap,
+  FxSnapshot,
+  BillId,
+  SharedUnitSplitsMap,
+} from "../types";
 
 export type LocalReceiptPage = {
   id: string;
@@ -12,9 +18,11 @@ export type LocalReceiptItem = {
   foreignName: string;
   // Translated/normalized name (English display name).
   translatedName: string;
-  // Line-total prices per item (before tax/tip).
+  // Unit price in receipt currency (before tax/tip).
   foreignPrice: number;
   usdPrice: number;
+  /** Units on this line; default 1. */
+  quantity?: number;
 };
 
 export type LocalParsedReceipt = {
@@ -36,6 +44,8 @@ export type LocalParticipant = {
   initials: string;
   color: string;
   isSelf: boolean;
+  isBirthday?: boolean;
+  birthdayCoveredByParticipantIds?: string[];
 };
 
 export type LocalBillDraft = {
@@ -47,11 +57,14 @@ export type LocalBillDraft = {
   receipt: {
     pages: LocalReceiptPage[];
     parsed: LocalParsedReceipt | null;
+    /** Set after auto-collapsing legacy expanded qty rows. */
+    itemsCollapsedVersion?: number;
   };
 
   participants: LocalParticipant[];
-  // itemId -> participantIds
   assignments: AssignmentMap;
+  /** itemId -> shared qty split evenly across listed participants */
+  sharedUnitSplits?: SharedUnitSplitsMap;
 };
 
 export const LOCAL_BILL_DRAFT_STORAGE_KEY = "billSplitter:activeDraft";
@@ -70,6 +83,7 @@ export const createEmptyLocalBillDraft = (): LocalBillDraft => {
     },
     participants: [],
     assignments: {},
+    sharedUnitSplits: {},
   };
 };
 
